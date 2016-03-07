@@ -5,3 +5,4 @@ authors = ["Rory McCann <rory@technomancy.org>"]
 license = "AGPL-3.0"
 
 [dependencies]
+time = "0.1"
