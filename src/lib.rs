@@ -76,10 +76,12 @@ pub struct ProgressRecorderIter<I> {
 }
 
 impl<I> ProgressRecorderIter<I> {
+    /// Create a new `ProgressRecorderIter` from another iterator.
     pub fn new(iter: I) -> ProgressRecorderIter<I> {
         ProgressRecorderIter{ iter: iter, count: 0, started_iterating: now_utc() }
     }
 
+    /// Calculate the current `ProgressRecord` for where we are now.
     fn generate_record(&mut self) -> ProgressRecord {
         self.count += 1;
         ProgressRecord{ num: self.count, iterating_for: now_utc() - self.started_iterating }
@@ -87,11 +89,13 @@ impl<I> ProgressRecorderIter<I> {
 
 }
 
+/// An iterator that records it's progress as it goes along
 pub trait ProgressableIter<I> {
     fn progress(self) -> ProgressRecorderIter<I>;
 }
 
 impl<I> ProgressableIter<I> for I where I: Iterator {
+    /// Convert an iterator into a `ProgressRecorderIter`.
     fn progress(self) -> ProgressRecorderIter<I> {
         ProgressRecorderIter::new(self)
     }
