@@ -196,9 +196,11 @@ mod test {
 
         let (state, _) = progressor.next().unwrap();
         assert_eq!(state.fraction(), Some(0.2));
+        assert_eq!(state.percent(), Some(20.));
 
         let (state, _) = progressor.next().unwrap();
         assert_eq!(state.fraction(), Some(0.4));
+        assert_eq!(state.percent(), Some(40.));
 
         let mut progressor = (0..).progress();
 
