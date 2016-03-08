@@ -15,7 +15,7 @@ impl ProgressRecord {
     /// Returns a basic log message of where we are now. You can construct this yourself, but this
     /// is a helpful convience method.
     pub fn message(&self) -> String {
-        format!("Have seen {} items and been iterating for {}", self.num_done(), self.iterating_for.num_seconds())
+        format!("{} - Seen {} Rate {}/sec", self.duration_since_start().num_seconds(), self.num_done(), self.rate())
     }
 
     /// Duration since iteration started
@@ -161,7 +161,7 @@ mod test {
 
         sleep_ms(500);
         let (state, _) = progressor.next().unwrap();
-        assert_eq!(state.message(), "Have seen 1 items and been iterating for 0");
+        assert_eq!(state.message(), "0 - Seen 1 Rate inf/sec");
         // It'll always print on the first one
         assert_eq!(state.should_print_every_items(2), true);
         assert_eq!(state.should_print_every_items(3), true);
@@ -170,7 +170,7 @@ mod test {
 
         sleep_ms(500);
         let (state, _) = progressor.next().unwrap();
-        assert_eq!(state.message(), "Have seen 2 items and been iterating for 1");
+        assert_eq!(state.message(), "1 - Seen 2 Rate 2/sec");
         assert_eq!(state.should_print_every_items(2), false);
         assert_eq!(state.should_print_every_items(3), false);
         assert_eq!(state.should_print_every_items(5), false);
@@ -178,7 +178,7 @@ mod test {
 
         sleep_ms(500);
         let (state, _) = progressor.next().unwrap();
-        assert_eq!(state.message(), "Have seen 3 items and been iterating for 1");
+        assert_eq!(state.message(), "1 - Seen 3 Rate 3/sec");
         assert_eq!(state.should_print_every_items(2), true);
         assert_eq!(state.should_print_every_items(3), false);
         assert_eq!(state.should_print_every_items(5), false);
@@ -186,7 +186,7 @@ mod test {
 
         sleep_ms(500);
         let (state, _) = progressor.next().unwrap();
-        assert_eq!(state.message(), "Have seen 4 items and been iterating for 2");
+        assert_eq!(state.message(), "2 - Seen 4 Rate 2/sec");
         assert_eq!(state.should_print_every_items(2), false);
         assert_eq!(state.should_print_every_items(3), true);
         assert_eq!(state.should_print_every_items(5), false);
