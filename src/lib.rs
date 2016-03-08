@@ -58,6 +58,15 @@ impl ProgressRecord {
         (self.num_done() - 1) % n == 0
     }
 
+    /// Print out `msg`, but only if there has been `n` items.
+    /// Often you want to print out a debug message every 1,000 items or so. This function does
+    /// that.
+    pub fn print_every(&self, n: usize, msg: &str) {
+        if should_print_every_items(n) {
+            print!(msg);
+        }
+    }
+
 }
 
 pub struct ProgressRecorderIter<I> {
