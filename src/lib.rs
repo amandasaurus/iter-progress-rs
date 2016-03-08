@@ -68,7 +68,7 @@ impl ProgressRecord {
     /// Print out `msg`, but only if there has been `n` items.
     /// Often you want to print out a debug message every 1,000 items or so. This function does
     /// that.
-    pub fn print_every(&self, n: usize, msg: &str) {
+    pub fn print_every<T: std::fmt::Display>(&self, n: usize, msg: T) {
         if self.should_print_every_items(n) {
             print!("{}", msg);
         }
