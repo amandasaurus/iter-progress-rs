@@ -85,9 +85,16 @@ impl ProgressRecord {
 
 }
 
+/// Wraps an iterator and keeps track of state used for `ProgressRecord`'s
 pub struct ProgressRecorderIter<I> {
+
+    /// The iterator that we are iteating on
     iter: I,
+
+    /// How many items have been seen
     count: usize,
+
+    /// When did we start iterating
     started_iterating: Tm,
 }
 
