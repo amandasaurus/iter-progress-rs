@@ -5,6 +5,8 @@ use std::iter::Iterator;
 use time::{now_utc, Tm, Duration};
 
 pub struct ProgressRecord {
+
+    /// How many elements before this
     num: usize,
     iterating_for: Duration,
     size_hint: (usize, Option<usize>),
