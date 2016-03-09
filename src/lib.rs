@@ -8,8 +8,11 @@ pub struct ProgressRecord {
 
     /// How many elements before this
     num: usize,
+
     iterating_for: Duration,
     size_hint: (usize, Option<usize>),
+
+    recent_rate: f32,
 
 }
 
@@ -17,7 +20,7 @@ impl ProgressRecord {
     /// Returns a basic log message of where we are now. You can construct this yourself, but this
     /// is a helpful convience method.
     pub fn message(&self) -> String {
-        format!("{} - Seen {} Rate {}/sec", self.duration_since_start().num_seconds(), self.num_done(), self.rate())
+        format!("{} - Seen {} Rate {}/sec", self.duration_since_start().num_seconds(), self.num_done(), self.recent_rate())
     }
 
     /// Duration since iteration started
@@ -85,6 +88,11 @@ impl ProgressRecord {
         }
     }
 
+    /// The rate of the last few items.
+    pub fn recent_rate(&self) -> f32 {
+        self.recent_rate
+    }
+
 }
 
 /// Wraps an iterator and keeps track of state used for `ProgressRecord`'s
@@ -98,18 +106,34 @@ pub struct ProgressRecorderIter<I> {
 
     /// When did we start iterating
     started_iterating: Tm,
+
+    /// Keeps track of recent times
+    recent_times: Vec<Tm>
 }
 
 impl<I: Iterator> ProgressRecorderIter<I> {
     /// Create a new `ProgressRecorderIter` from another iterator.
     pub fn new(iter: I) -> ProgressRecorderIter<I> {
-        ProgressRecorderIter{ iter: iter, count: 0, started_iterating: now_utc() }
+        ProgressRecorderIter{ iter: iter, count: 0, started_iterating: now_utc(), recent_times: Vec::with_capacity(5) }
     }
 
     /// Calculate the current `ProgressRecord` for where we are now.
     fn generate_record(&mut self) -> ProgressRecord {
+        let now = now_utc();
+        self.recent_times.push(now);
+        while self.recent_times.len() > 100 {
+            self.recent_times.remove(0);
+        }
+
+        //println!("\n");
+        //println!("Recents {:?} now {:?}", self.recent_times.iter().map(|&d| { (now - d).num_seconds() }).collect::<Vec<_>>(), now);
+        let recent_rate = match self.recent_times.get(0) { None => { ::std::f32::INFINITY }, Some(&first) => {
+            //println!("{} {}", self.recent_times.len() as f32, (now - first).num_seconds() as f32);
+            (self.recent_times.len() as f32 ) / ((now - first).num_seconds() as f32)
+        }, };
+
         self.count += 1;
-        ProgressRecord{ num: self.count, iterating_for: now_utc() - self.started_iterating, size_hint: self.iter.size_hint() }
+        ProgressRecord{ num: self.count, iterating_for: now - self.started_iterating, size_hint: self.iter.size_hint(), recent_rate: recent_rate }
     }
 
 }
@@ -169,6 +193,7 @@ mod test {
         assert_eq!(state.should_print_every_items(3), true);
         assert_eq!(state.should_print_every_items(5), true);
         assert_eq!(state.rate(), ::std::f32::INFINITY);
+        assert_eq!(state.recent_rate(), ::std::f32::INFINITY);
 
         sleep_ms(500);
         let (state, _) = progressor.next().unwrap();
@@ -177,6 +202,7 @@ mod test {
         assert_eq!(state.should_print_every_items(3), false);
         assert_eq!(state.should_print_every_items(5), false);
         assert_eq!(state.rate(), 2.);
+        //assert_eq!(state.recent_rate(), 2.);
 
         sleep_ms(500);
         let (state, _) = progressor.next().unwrap();
@@ -185,6 +211,7 @@ mod test {
         assert_eq!(state.should_print_every_items(3), false);
         assert_eq!(state.should_print_every_items(5), false);
         assert_eq!(state.rate(), 3.);
+        assert_eq!(state.recent_rate(), 3.);
 
         sleep_ms(500);
         let (state, _) = progressor.next().unwrap();
@@ -193,6 +220,7 @@ mod test {
         assert_eq!(state.should_print_every_items(3), true);
         assert_eq!(state.should_print_every_items(5), false);
         assert_eq!(state.rate(), 2.);
+        assert_eq!(state.recent_rate(), 2.);
     }
 
     #[test]
