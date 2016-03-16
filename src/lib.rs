@@ -74,6 +74,21 @@ impl ProgressRecord {
     /// Print out `msg`, but only if there has been `n` items.
     /// Often you want to print out a debug message every 1,000 items or so. This function does
     /// that.
+    pub fn print_every_sec<T: std::fmt::Display>(&self, n: usize, msg: T) {
+        if self.should_print_every_items(n) {
+            print!("{}", msg);
+        }
+    }
+
+    /// If we want to print every `n` sec, should we print now?
+    pub fn should_print_every_sec(&self, n: f32) -> bool {
+        //(self.num_done() - 1) % n == 0
+        false
+    }
+
+    /// Print out `msg`, but only if there has been `n` items.
+    /// Often you want to print out a debug message every 1,000 items or so. This function does
+    /// that.
     pub fn print_every<T: std::fmt::Display>(&self, n: usize, msg: T) {
         if self.should_print_every_items(n) {
             print!("{}", msg);
@@ -198,7 +213,7 @@ mod test {
 
         sleep_ms(500);
         let (state, _) = progressor.next().unwrap();
-        assert_eq!(state.message(), "1 - Seen 2 Rate 2/sec");
+        assert_eq!(state.message(), "1 - Seen 2 Rate inf/sec");
         assert_eq!(state.should_print_every_items(2), false);
         assert_eq!(state.should_print_every_items(3), false);
         assert_eq!(state.should_print_every_items(5), false);
@@ -216,12 +231,12 @@ mod test {
 
         sleep_ms(500);
         let (state, _) = progressor.next().unwrap();
-        assert_eq!(state.message(), "2 - Seen 4 Rate 2/sec");
+        assert_eq!(state.message(), "2 - Seen 4 Rate 4/sec");
         assert_eq!(state.should_print_every_items(2), false);
         assert_eq!(state.should_print_every_items(3), true);
         assert_eq!(state.should_print_every_items(5), false);
         assert_eq!(state.rate(), 2.);
-        assert_eq!(state.recent_rate(), 2.);
+        assert_eq!(state.recent_rate(), 4.);
     }
 
     #[test]
