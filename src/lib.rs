@@ -9,6 +9,7 @@ pub struct ProgressRecord {
     /// How many elements before this
     num: usize,
 
+    /// How long since we started iterating.
     iterating_for: Duration,
     size_hint: (usize, Option<usize>),
 
