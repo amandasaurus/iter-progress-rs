@@ -1,3 +1,16 @@
+<a name="v0.2.0"></a>
+## v0.2.0 (2016-04-11)
+
+
+#### Features
+
+*   Add should_print_every_sec method ([fd554c55](fd554c55))
+*   ProgressRecords now keep track of when iteration started ([9e7fb771](9e7fb771))
+*   Keep track of previous timestamp of records ([bb2208f6](bb2208f6))
+*   Keep track of recent rate, rather than global rate ([46e43adb](46e43adb))
+
+
+
 <a name=""></a>
 ##  (2016-03-08)
 
