@@ -92,13 +92,38 @@ impl ProgressRecord {
         }
     }
 
+    /// Do thing but only if there has been `n` items.
+    /// Often you want to print out a debug message every 1,000 items or so. This function does
+    /// that.
+    pub fn do_every_sec<F: Fn(&Self)>(&self, n: f32, f: F) {
+        if self.should_print_every_sec(n) {
+            f(self);
+        }
+    }
+
     /// If we want to print every `n` sec, should we print now?
     pub fn should_print_every_sec(&self, n: f32) -> bool {
-        let sec_since_start = self.duration_since_start().num_seconds();
+        // get the secs since start as a f32. We only work in millisecond percision
+        let secs_since_start: f32 = (self.duration_since_start().num_milliseconds() as f32) / 1_000.;
+
         let now = now_utc();
-            
-        //(self.num_done() - 1) % n == 0
-        false
+
+        match self.previous_record_tm() {
+            None => {
+                // This iteration is the first time, so we should print if more than `n` seconds
+                // have gone past
+                secs_since_start > n
+            },
+            Some(last_time) => {
+                let last_time_offset = ( last_time - self.started_iterating() );
+                let last_time_offset: f32 = (last_time_offset.num_milliseconds() as f32) / 1_000.;
+
+                let current_step = (secs_since_start / n);
+                let last_step = (last_time_offset / n);
+
+                current_step.trunc() > last_step.trunc()
+            },
+        }
     }
 
     /// If we want to print every `n` items, should we print now?
@@ -249,6 +274,10 @@ mod test {
         // First run, so there should be nothing here
         assert!(state.previous_record_tm().is_none());
 
+        assert_eq!(state.should_print_every_sec(1.), false);
+        assert_eq!(state.should_print_every_sec(2.), false);
+        assert_eq!(state.should_print_every_sec(0.3), true);
+
 
         sleep_ms(500);
 
@@ -265,6 +294,9 @@ mod test {
         assert_eq!((now_utc() - last_time).num_milliseconds(), 500);
         assert!((now_utc() - last_time).num_milliseconds() < 550);
         assert!((now_utc() - last_time).num_milliseconds() >= 500);
+        assert_eq!(state.should_print_every_sec(1.), true);
+        assert_eq!(state.should_print_every_sec(2.), false);
+        assert_eq!(state.should_print_every_sec(0.8), true);
 
         sleep_ms(500);
         let (state, _) = progressor.next().unwrap();
@@ -274,6 +306,10 @@ mod test {
         assert_eq!(state.should_print_every_items(5), false);
         assert_eq!(state.rate(), 3.);
         assert_eq!(state.recent_rate(), 3.);
+        assert_eq!(state.should_print_every_sec(1.), false);
+        assert_eq!(state.should_print_every_sec(2.), false);
+        assert_eq!(state.should_print_every_sec(0.8), false);
+        assert_eq!(state.should_print_every_sec(1.5), true);
 
         sleep_ms(500);
         let (state, _) = progressor.next().unwrap();
