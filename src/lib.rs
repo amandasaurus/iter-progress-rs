@@ -103,8 +103,6 @@ impl ProgressRecord {
         // get the secs since start as a f32. We only work in millisecond percision
         let secs_since_start: f32 = (self.duration_since_start().num_milliseconds() as f32) / 1_000.;
 
-        let now = now_utc();
-
         match self.previous_record_tm() {
             None => {
                 // This iteration is the first time, so we should print if more than `n` seconds
@@ -112,11 +110,11 @@ impl ProgressRecord {
                 secs_since_start > n
             },
             Some(last_time) => {
-                let last_time_offset = ( last_time - self.started_iterating() );
+                let last_time_offset = last_time - self.started_iterating();
                 let last_time_offset: f32 = (last_time_offset.num_milliseconds() as f32) / 1_000.;
 
-                let current_step = (secs_since_start / n);
-                let last_step = (last_time_offset / n);
+                let current_step = secs_since_start / n;
+                let last_step = last_time_offset / n;
 
                 current_step.trunc() > last_step.trunc()
             },
