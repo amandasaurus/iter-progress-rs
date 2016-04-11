@@ -19,6 +19,9 @@ pub struct ProgressRecord {
     /// The timestamp of when the previous record was created. Will be None if this is first.
     previous_record_tm: Option<Tm>,
 
+    /// When the iteration started
+    started_iterating: Tm,
+
 }
 
 impl ProgressRecord {
@@ -41,6 +44,11 @@ impl ProgressRecord {
     /// Tm for when the previous record was generated. None if there was no previous record.
     pub fn previous_record_tm(&self) -> Option<Tm> {
         self.previous_record_tm
+    }
+
+    /// When the iteration started
+    pub fn started_iterating(&self) -> Tm {
+        self.started_iterating
     }
 
     /// Prints a basic message
@@ -177,7 +185,7 @@ impl<I: Iterator> ProgressRecorderIter<I> {
         //}
 
         self.count += 1;
-        ProgressRecord{ num: self.count, iterating_for: now - self.started_iterating, size_hint: self.iter.size_hint(), recent_rate: recent_rate, previous_record_tm: previous_record_tm }
+        ProgressRecord{ num: self.count, iterating_for: now - self.started_iterating, size_hint: self.iter.size_hint(), recent_rate: recent_rate, previous_record_tm: previous_record_tm, started_iterating: self.started_iterating }
     }
 
 }
