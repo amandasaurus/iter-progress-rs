@@ -83,26 +83,23 @@ impl ProgressRecord {
         }
     }
 
-    /// Print out `msg`, but only if there has been `n` items.
-    /// Often you want to print out a debug message every 1,000 items or so. This function does
-    /// that.
-    pub fn print_every_sec<T: std::fmt::Display>(&self, n: f32, msg: T) {
-        if self.should_print_every_sec(n) {
+    /// Print out `msg`, but only if there has been `n` seconds since last printout
+    pub fn print_every_n_sec<T: std::fmt::Display>(&self, n: f32, msg: T) {
+        if self.should_do_every_n_sec(n) {
             print!("{}", msg);
         }
     }
 
-    /// Do thing but only if there has been `n` items.
-    /// Often you want to print out a debug message every 1,000 items or so. This function does
-    /// that.
-    pub fn do_every_sec<F: Fn(&Self)>(&self, n: f32, f: F) {
-        if self.should_print_every_sec(n) {
+    /// Do thing but only every n sec (as far as possible).
+    /// Could be a print statement.
+    pub fn do_every_n_sec<F: Fn(&Self)>(&self, n: f32, f: F) {
+        if self.should_do_every_n_sec(n) {
             f(self);
         }
     }
 
     /// If we want to print every `n` sec, should we print now?
-    pub fn should_print_every_sec(&self, n: f32) -> bool {
+    pub fn should_do_every_n_sec(&self, n: f32) -> bool {
         // get the secs since start as a f32. We only work in millisecond percision
         let secs_since_start: f32 = (self.duration_since_start().num_milliseconds() as f32) / 1_000.;
 
@@ -127,17 +124,26 @@ impl ProgressRecord {
     }
 
     /// If we want to print every `n` items, should we print now?
-    pub fn should_print_every_items(&self, n: usize) -> bool {
+    pub fn should_do_every_n_items(&self, n: usize) -> bool {
         (self.num_done() - 1) % n == 0
     }
+
 
 
     /// Print out `msg`, but only if there has been `n` items.
     /// Often you want to print out a debug message every 1,000 items or so. This function does
     /// that.
-    pub fn print_every<T: std::fmt::Display>(&self, n: usize, msg: T) {
-        if self.should_print_every_items(n) {
+    pub fn print_every_n_items<T: std::fmt::Display>(&self, n: usize, msg: T) {
+        if self.should_do_every_n_items(n) {
             print!("{}", msg);
+        }
+    }
+
+    /// Do thing but only every n items.
+    /// Could be a print statement.
+    pub fn do_every_n_items<F: Fn(&Self)>(&self, n: usize, f: F) {
+        if self.should_do_every_n_items(n) {
+            f(self);
         }
     }
 
@@ -266,26 +272,26 @@ mod test {
         let (state, _) = progressor.next().unwrap();
         assert_eq!(state.message(), "0 - Seen 1 Rate inf/sec");
         // It'll always print on the first one
-        assert_eq!(state.should_print_every_items(2), true);
-        assert_eq!(state.should_print_every_items(3), true);
-        assert_eq!(state.should_print_every_items(5), true);
+        assert_eq!(state.should_do_every_n_items(2), true);
+        assert_eq!(state.should_do_every_n_items(3), true);
+        assert_eq!(state.should_do_every_n_items(5), true);
         assert_eq!(state.rate(), ::std::f32::INFINITY);
         assert_eq!(state.recent_rate(), ::std::f32::INFINITY);
         // First run, so there should be nothing here
         assert!(state.previous_record_tm().is_none());
 
-        assert_eq!(state.should_print_every_sec(1.), false);
-        assert_eq!(state.should_print_every_sec(2.), false);
-        assert_eq!(state.should_print_every_sec(0.3), true);
+        assert_eq!(state.should_do_every_n_sec(1.), false);
+        assert_eq!(state.should_do_every_n_sec(2.), false);
+        assert_eq!(state.should_do_every_n_sec(0.3), true);
 
 
         sleep_ms(500);
 
         let (state, _) = progressor.next().unwrap();
         assert_eq!(state.message(), "1 - Seen 2 Rate inf/sec");
-        assert_eq!(state.should_print_every_items(2), false);
-        assert_eq!(state.should_print_every_items(3), false);
-        assert_eq!(state.should_print_every_items(5), false);
+        assert_eq!(state.should_do_every_n_items(2), false);
+        assert_eq!(state.should_do_every_n_items(3), false);
+        assert_eq!(state.should_do_every_n_items(5), false);
         assert_eq!(state.rate(), 2.);
         //assert_eq!(state.recent_rate(), 2.);
         // This'll be the time for the first one
@@ -294,29 +300,29 @@ mod test {
         assert_eq!((now_utc() - last_time).num_milliseconds(), 500);
         assert!((now_utc() - last_time).num_milliseconds() < 550);
         assert!((now_utc() - last_time).num_milliseconds() >= 500);
-        assert_eq!(state.should_print_every_sec(1.), true);
-        assert_eq!(state.should_print_every_sec(2.), false);
-        assert_eq!(state.should_print_every_sec(0.8), true);
+        assert_eq!(state.should_do_every_n_sec(1.), true);
+        assert_eq!(state.should_do_every_n_sec(2.), false);
+        assert_eq!(state.should_do_every_n_sec(0.8), true);
 
         sleep_ms(500);
         let (state, _) = progressor.next().unwrap();
         assert_eq!(state.message(), "1 - Seen 3 Rate 3/sec");
-        assert_eq!(state.should_print_every_items(2), true);
-        assert_eq!(state.should_print_every_items(3), false);
-        assert_eq!(state.should_print_every_items(5), false);
+        assert_eq!(state.should_do_every_n_items(2), true);
+        assert_eq!(state.should_do_every_n_items(3), false);
+        assert_eq!(state.should_do_every_n_items(5), false);
         assert_eq!(state.rate(), 3.);
         assert_eq!(state.recent_rate(), 3.);
-        assert_eq!(state.should_print_every_sec(1.), false);
-        assert_eq!(state.should_print_every_sec(2.), false);
-        assert_eq!(state.should_print_every_sec(0.8), false);
-        assert_eq!(state.should_print_every_sec(1.5), true);
+        assert_eq!(state.should_do_every_n_sec(1.), false);
+        assert_eq!(state.should_do_every_n_sec(2.), false);
+        assert_eq!(state.should_do_every_n_sec(0.8), false);
+        assert_eq!(state.should_do_every_n_sec(1.5), true);
 
         sleep_ms(500);
         let (state, _) = progressor.next().unwrap();
         assert_eq!(state.message(), "2 - Seen 4 Rate 4/sec");
-        assert_eq!(state.should_print_every_items(2), false);
-        assert_eq!(state.should_print_every_items(3), true);
-        assert_eq!(state.should_print_every_items(5), false);
+        assert_eq!(state.should_do_every_n_items(2), false);
+        assert_eq!(state.should_do_every_n_items(3), true);
+        assert_eq!(state.should_do_every_n_items(5), false);
         assert_eq!(state.rate(), 2.);
         assert_eq!(state.recent_rate(), 4.);
     }
