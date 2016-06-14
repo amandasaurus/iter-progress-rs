@@ -3,6 +3,10 @@ authors = ["Rory McCann <rory@technomancy.org>"]
 license = "GPL-3.0"
 name = "iter-progress"
 version = "0.3.0"
+description = "Calculate progress of your iterators"
+repository = "https://github.com/rory/iter-progress-rs"
+keywords = [ "iterator" ]
+readme = "README.md"
 
 [dependencies]
 time = "^0.1"
