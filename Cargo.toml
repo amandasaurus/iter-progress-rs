@@ -1,6 +1,6 @@
 [package]
 authors = ["Rory McCann <rory@technomancy.org>"]
-license = "AGPL-3.0"
+license = "GPL-3.0"
 name = "iter-progress"
 version = "0.2.0"
 
