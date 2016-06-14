@@ -5,4 +5,4 @@ name = "iter-progress"
 version = "0.2.0"
 
 [dependencies]
-time = "0.1"
+time = "^0.1"
