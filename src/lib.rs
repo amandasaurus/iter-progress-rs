@@ -1,8 +1,5 @@
-extern crate time;
-
 use std::iter::Iterator;
-
-use time::{now_utc, Tm, Duration};
+use std::time::{Instant, Duration};
 
 pub struct ProgressRecord {
 
@@ -17,10 +14,10 @@ pub struct ProgressRecord {
     recent_rate: f32,
 
     /// The timestamp of when the previous record was created. Will be None if this is first.
-    previous_record_tm: Option<Tm>,
+    previous_record_tm: Option<Instant>,
 
     /// When the iteration started
-    started_iterating: Tm,
+    started_iterating: Instant,
 
 }
 
@@ -28,7 +25,7 @@ impl ProgressRecord {
     /// Returns a basic log message of where we are now. You can construct this yourself, but this
     /// is a helpful convience method.
     pub fn message(&self) -> String {
-        format!("{} - Seen {} Rate {}/sec", self.duration_since_start().num_seconds(), self.num_done(), self.recent_rate())
+        format!("{} - Seen {} Rate {}/sec", self.duration_since_start().as_secs(), self.num_done(), self.recent_rate())
     }
 
     /// Duration since iteration started
@@ -41,13 +38,13 @@ impl ProgressRecord {
         self.num
     }
 
-    /// Tm for when the previous record was generated. None if there was no previous record.
-    pub fn previous_record_tm(&self) -> Option<Tm> {
+    /// Instant for when the previous record was generated. None if there was no previous record.
+    pub fn previous_record_tm(&self) -> Option<Instant> {
         self.previous_record_tm
     }
 
     /// When the iteration started
-    pub fn started_iterating(&self) -> Tm {
+    pub fn started_iterating(&self) -> Instant {
         self.started_iterating
     }
 
@@ -59,7 +56,8 @@ impl ProgressRecord {
     /// Number of items per second
     pub fn rate(&self) -> f32 {
         // number of items per second
-        (self.num_done() as f32) / (self.duration_since_start().num_seconds() as f32)
+        let duration_since_start = self.duration_since_start();
+        (self.num_done() as f32) / (duration_since_start.as_secs() as f32)
     }
 
     /// None if we don't know how much we've done (as a fraction), otherwise a value form 0 to 1
@@ -100,8 +98,9 @@ impl ProgressRecord {
 
     /// If we want to print every `n` sec, should we print now?
     pub fn should_do_every_n_sec(&self, n: f32) -> bool {
-        // get the secs since start as a f32. We only work in millisecond percision
-        let secs_since_start: f32 = (self.duration_since_start().num_milliseconds() as f32) / 1_000.;
+        // get the secs since start as a f32
+        let duration_since_start = self.duration_since_start();
+        let secs_since_start: f32 = duration_since_start.as_secs() as f32 + duration_since_start.subsec_nanos() as f32 / 1_000_000_000.0;
 
         match self.previous_record_tm() {
             None => {
@@ -111,7 +110,7 @@ impl ProgressRecord {
             },
             Some(last_time) => {
                 let last_time_offset = last_time - self.started_iterating();
-                let last_time_offset: f32 = (last_time_offset.num_milliseconds() as f32) / 1_000.;
+                let last_time_offset: f32 = last_time_offset.as_secs() as f32 + last_time_offset.subsec_nanos() as f32 / 1_000_000_000.0;
 
                 let current_step = secs_since_start / n;
                 let last_step = last_time_offset / n;
@@ -171,34 +170,35 @@ pub struct ProgressRecorderIter<I> {
     count: usize,
 
     /// When did we start iterating
-    started_iterating: Tm,
+    started_iterating: Instant,
 
     /// Keeps track of recent times
-    recent_times: Vec<Tm>
+    recent_times: Vec<Instant>
 }
 
 impl<I: Iterator> ProgressRecorderIter<I> {
     /// Create a new `ProgressRecorderIter` from another iterator.
     pub fn new(iter: I) -> ProgressRecorderIter<I> {
-        ProgressRecorderIter{ iter: iter, count: 0, started_iterating: now_utc(), recent_times: Vec::with_capacity(5) }
+        ProgressRecorderIter{ iter: iter, count: 0, started_iterating: Instant::now(), recent_times: Vec::with_capacity(5) }
     }
 
     /// Calculate the current `ProgressRecord` for where we are now.
     fn generate_record(&mut self) -> ProgressRecord {
         // recent_times is a vec of times, with newer times at the end. However it'll always be <
         // 100 elements long.
-        let now = now_utc();
+        let now = Instant::now();
         self.recent_times.push(now);
         while self.recent_times.len() > 100 {
             self.recent_times.remove(0);
         }
 
-        //println!("\nStart of generate_record");
-        //println!("Recents {:?} now {}", self.recent_times.iter().map(|d| { format!("{}", d.rfc3339()) }).collect::<Vec<_>>(), now.rfc3339());
-        let recent_rate = match self.recent_times.get(0) { None => { ::std::f32::INFINITY }, Some(&first) => {
-            //println!("{} {}", self.recent_times.len() as f32, (now - first).num_seconds() as f32);
-            (self.recent_times.len() as f32 ) / ((now - first).num_seconds() as f32)
-        }, };
+        let recent_rate = match self.recent_times.get(0) {
+            None => ::std::f32::INFINITY,
+            Some(&first) => {
+                let dur = now - first;
+                (self.recent_times.len() as f32 ) / (dur.as_secs() as f32)
+            },
+        };
 
         // last element of recent_times will be the current time, for this record. so second last
         // will be the previous time. In python we'd do [-1] for the last, and [-2] for second
@@ -209,9 +209,6 @@ impl<I: Iterator> ProgressRecorderIter<I> {
                 self.recent_times.get(self.recent_times.len()-2).map(|t| { t.clone() })
             }
         };
-        //if let Some(t) = previous_record_tm {
-        //    println!("Previous record {}", t.rfc3339());
-        //}
 
         self.count += 1;
         ProgressRecord{ num: self.count, iterating_for: now - self.started_iterating, size_hint: self.iter.size_hint(), recent_rate: recent_rate, previous_record_tm: previous_record_tm, started_iterating: self.started_iterating }
@@ -260,13 +257,13 @@ mod test {
     #[test]
     fn test_simple() {
         use super::ProgressableIter;
-        use std::thread::sleep_ms;
-        use time::{now_utc, Duration};
+        use std::thread::sleep;
+        use std::time::Duration;
 
         let vec: Vec<u8> = vec![0, 1, 2, 3, 4];
         let mut progressor = vec.iter().progress();
 
-        sleep_ms(500);
+        sleep(Duration::from_millis(500));
         let (state, _) = progressor.next().unwrap();
         assert_eq!(state.message(), "0 - Seen 1 Rate inf/sec");
         // It'll always print on the first one
@@ -283,7 +280,7 @@ mod test {
         assert_eq!(state.should_do_every_n_sec(0.3), true);
 
 
-        sleep_ms(500);
+        sleep(Duration::from_millis(500));
 
         let (state, _) = progressor.next().unwrap();
         assert_eq!(state.message(), "1 - Seen 2 Rate inf/sec");
@@ -294,15 +291,14 @@ mod test {
         //assert_eq!(state.recent_rate(), 2.);
         // This'll be the time for the first one
         assert!(state.previous_record_tm().is_some());
-        let last_time = state.previous_record_tm().unwrap();
-        assert_eq!((now_utc() - last_time).num_milliseconds(), 500);
-        assert!((now_utc() - last_time).num_milliseconds() < 550);
-        assert!((now_utc() - last_time).num_milliseconds() >= 500);
+        let since_last_time = state.previous_record_tm().unwrap().elapsed();
+        assert!(since_last_time < Duration::from_millis(550));
+        assert!(since_last_time >= Duration::from_millis(500));
         assert_eq!(state.should_do_every_n_sec(1.), true);
         assert_eq!(state.should_do_every_n_sec(2.), false);
         assert_eq!(state.should_do_every_n_sec(0.8), true);
 
-        sleep_ms(500);
+        sleep(Duration::from_millis(500));
         let (state, _) = progressor.next().unwrap();
         assert_eq!(state.message(), "1 - Seen 3 Rate 3/sec");
         assert_eq!(state.should_do_every_n_items(2), true);
@@ -315,7 +311,7 @@ mod test {
         assert_eq!(state.should_do_every_n_sec(0.8), false);
         assert_eq!(state.should_do_every_n_sec(1.5), true);
 
-        sleep_ms(500);
+        sleep(Duration::from_millis(500));
         let (state, _) = progressor.next().unwrap();
         assert_eq!(state.message(), "2 - Seen 4 Rate 4/sec");
         assert_eq!(state.should_do_every_n_items(2), false);
@@ -328,7 +324,6 @@ mod test {
     #[test]
     fn test_size_hint() {
         use super::ProgressableIter;
-        use time::Duration;
 
         let vec: Vec<u8> = vec![0, 1, 2, 3, 4];
         let mut progressor = vec.iter().progress();
