@@ -7,6 +7,3 @@ description = "Calculate progress of your iterators"
 repository = "https://github.com/rory/iter-progress-rs"
 keywords = [ "iterator" ]
 readme = "README.md"
-
-[dependencies]
-time = "^0.1"
