@@ -214,6 +214,11 @@ impl<I: Iterator> ProgressRecorderIter<I> {
         ProgressRecord{ num: self.count, iterating_for: now - self.started_iterating, size_hint: self.iter.size_hint(), recent_rate: recent_rate, previous_record_tm: previous_record_tm, started_iterating: self.started_iterating }
     }
 
+    /// Gets the original iterator back
+    pub fn into_inner(self) -> I {
+        self.iter
+    }
+
 }
 
 /// An iterator that records it's progress as it goes along
