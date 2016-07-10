@@ -1,6 +1,32 @@
+//! Wrap an iterator, and get progress data as it's executed.
+//! A more advanced `.enumerate()`
+//!
+//! # Example
+//! ```
+//! use iter_progress::ProgressableIter;
+//! // Create an iterator that goes from 0 to 1,000
+//! let my_iter = 0..1_000;
+//! let mut progressor = my_iter.progress();
+//!
+//! // This new iterator returns a struct with the current state, and the inner object returned by
+//! // the iterator
+//! let (state, number) = progressor.next().unwrap();
+//! assert_eq!(number, 0);
+//! 
+//! // We can now use methods on `state` to find out about this object
+//!
+//! assert_eq!(state.fraction(), Some(0.001));  /// 0 to 1
+//! assert_eq!(state.percent(), Some(0.1));     /// We are 0.1% the way through
+//! ```
+//! 
+//! There are numerous 
+//! 
 use std::iter::Iterator;
 use std::time::{Instant, Duration};
 
+/// Every step of the underlying iterator, one of these is generated. It contains all the
+/// information of how this iterator is progresing. Use the methods to access data on it.
+///
 pub struct ProgressRecord {
 
     /// How many elements before this
