@@ -1,7 +1,13 @@
-//! Wrap an iterator, and get progress data as it's executed.
-//! A more advanced `.enumerate()`
+//! Wrap an iterator, and get progress data as it's executed. A more advanced
+//! [`.enumerate()`](https://doc.rust-lang.org/std/iter/trait.Iterator.html#method.enumerate)
+//!
+//! # Usage
+//! Call `.progress()` on any Iterator, and get a new iterator that yields `(ProgressRecord, T)`, where `T`
+//! is the original value. A `ProgressRecord` has many helpful methods to query the current state
+//! of the iterator
 //!
 //! # Example
+//!
 //! ```
 //! use iter_progress::ProgressableIter;
 //! // Create an iterator that goes from 0 to 1,000
@@ -15,11 +21,13 @@
 //! 
 //! // We can now use methods on `state` to find out about this object
 //!
-//! assert_eq!(state.fraction(), Some(0.001));  /// 0 to 1
-//! assert_eq!(state.percent(), Some(0.1));     /// We are 0.1% the way through
+//! // 0 to 1
+//! assert_eq!(state.fraction(), Some(0.001));
+//! // We are 0.1% the way through
+//! assert_eq!(state.percent(), Some(0.1));
 //! ```
 //! 
-//! There are numerous 
+//! There are numerous ergnomic methods for access data on the state of the iterator
 //! 
 use std::iter::Iterator;
 use std::time::{Instant, Duration};
@@ -48,23 +56,34 @@ pub struct ProgressRecord {
 }
 
 impl ProgressRecord {
-    /// Returns a basic log message of where we are now. You can construct this yourself, but this
-    /// is a helpful convience method.
-    pub fn message(&self) -> String {
-        format!("{} - Seen {} Rate {}/sec", self.duration_since_start().as_secs(), self.num_done(), self.recent_rate())
-    }
 
     /// Duration since iteration started
     pub fn duration_since_start(&self) -> Duration {
         self.iterating_for
     }
 
-    /// Number of items we've generated so far
+    /// Number of items we've generated so far. Will be 0 for the first element
+    ///
+    /// ``
+    /// # use iter_progress::ProgressableIter;
+    /// let mut progressor = (0..1_000).progress();
+    /// let (state, num) = progressor.next().unwrap();
+    /// assert_eq!(state.num_done(), 0);
+    /// ```
+    ///
+    /// ```
+    /// # use iter_progress::ProgressableIter;
+    /// let mut progressor = (0..1_000).progress().skip(120);
+    /// let (state, num) = progressor.next().unwrap();
+    /// assert_eq!(state.num_done(), 121);
+    /// ```
     pub fn num_done(&self) -> usize {
         self.num
     }
 
-    /// Instant for when the previous record was generated. None if there was no previous record.
+    /// `Instant` for when the previous record was generated. None if there was no previous record.
+    /// 
+    /// This can be useful for calculating fine grained rates
     pub fn previous_record_tm(&self) -> Option<Instant> {
         self.previous_record_tm
     }
@@ -79,15 +98,38 @@ impl ProgressRecord {
         println!("{}", self.message());
     }
 
-    /// Number of items per second
+    /// Returns a basic log message of where we are now. You can construct this yourself, but this
+    /// is a helpful convience method.
+    /// Currently looks likt "{time_since_start} - Seen {num_see} Rate {rate}/sec", but the library
+    /// might change it later. Construct your own message.
+    pub fn message(&self) -> String {
+        format!("{} - Seen {} Rate {}/sec", self.duration_since_start().as_secs(), self.num_done(), self.recent_rate())
+    }
+
+    /// Number of items per second, calcualted from the start
     pub fn rate(&self) -> f32 {
         // number of items per second
         let duration_since_start = self.duration_since_start();
         (self.num_done() as f32) / (duration_since_start.as_secs() as f32)
     }
 
-    /// None if we don't know how much we've done (as a fraction), otherwise a value form 0 to 1
-    /// for what fraction along we are.
+    /// How far through the iterator as a fraction, if known
+    ///
+    /// ```
+    /// use iter_progress::ProgressableIter;
+    /// let mut progressor = (0..1_000).progress().skip(120);
+    /// let (state, num) = progressor.next().unwrap();
+    /// assert_eq!(num, 120);
+    /// assert_eq!(state.fraction(), Some(0.121));
+    /// ```
+    ///
+    /// Returns None if we cannot know, e.g. for an infinite iterator
+    /// ```
+    /// # use iter_progress::ProgressableIter;
+    /// let mut progressor = (0..).progress().skip(120);
+    /// let (state, num) = progressor.next().unwrap();
+    /// assert_eq!(state.fraction(), None);
+    /// ```
     pub fn fraction(&self) -> Option<f32> {
         if self.is_size_known() {
             let remaining = self.size_hint.0;
@@ -98,8 +140,22 @@ impl ProgressRecord {
         }
     }
 
-    /// None if we don't know how much we've done, otherwise value for 0 to 100 representing how
-    /// far along as a percentage we are.
+    /// Percentage progress through the iterator, if known.
+    ///
+    /// ```
+    /// use iter_progress::ProgressableIter;
+    /// let mut progressor = (0..1_000).progress().skip(120);
+    /// let (state, num) = progressor.next().unwrap();
+    /// assert_eq!(state.percent(), Some(12.1));
+    /// ```
+    ///
+    /// Returns None if we cannot know, e.g. for an infinite iterator
+    /// ```
+    /// # use iter_progress::ProgressableIter;
+    /// let mut progressor = (0..).progress().skip(120);
+    /// let (state, num) = progressor.next().unwrap();
+    /// assert_eq!(state.percent(), None);
+    /// ```
     pub fn percent(&self) -> Option<f32> {
         match self.fraction() {
             None => { None }
@@ -152,7 +208,6 @@ impl ProgressRecord {
     }
 
 
-
     /// Print out `msg`, but only if there has been `n` items.
     /// Often you want to print out a debug message every 1,000 items or so. This function does
     /// that.
@@ -162,16 +217,28 @@ impl ProgressRecord {
         }
     }
 
-    /// Do thing but only every n items.
+    /// Do thing but only every `n` items.
     /// Could be a print statement.
+    ///
+    /// takes 2 arguments, `n` and the function (`f`) which takes a `&ProgressState`. `f` will only
+    /// be called every `n` items that pass through the iterator.
+    ///
+    /// ```
+    /// # use iter_progress::ProgressableIter;
+    /// for (state, _) in (0..150).progress() {
+    ///    state.do_every_n_items(5, |state| {
+    ///        println!("Current progress: {}%", state.percent().unwrap());
+    ///    });
+    /// }
+    /// ```
     pub fn do_every_n_items<F: Fn(&Self)>(&self, n: usize, f: F) {
         if self.should_do_every_n_items(n) {
             f(self);
         }
     }
 
-    /// Does the size_hint tell us exactly how many items are left? False iff there is some
-    /// ambiguity/unknown
+    /// Do we know how big this iterator is?
+    /// False iff there is some ambiguity/unknown
     fn is_size_known(&self) -> bool {
         match self.size_hint.1 {
             None => { false },
