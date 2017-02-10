@@ -1,3 +1,13 @@
+<a name="v0.4.0"></a>
+## v0.4.0 (2017-02-10)
+
+
+#### Features
+
+*   Add .into_inner() to get the inner iter back out ([940a4626](940a4626))
+
+
+
 <a name="v0.2.0"></a>
 ## v0.2.0 (2016-04-11)
 
