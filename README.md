@@ -1,7 +1,7 @@
 # iter-progress
 
 [![Build Status](https://travis-ci.org/rory/iter-progress-rs.svg?branch=master)](https://travis-ci.org/rory/iter-progress-rs)
-[![Crates.io](https://img.shields.io/crates/v/iter-progress.svg)]()
+[![Crates.io](https://img.shields.io/crates/v/iter-progress.svg)](https://crates.io/crates/iter-progress)
 [![Documentation](https://docs.rs/iter-progress/badge.svg)](https://docs.rs/iter-progress/)
 
 # [Documentation](https://docs.rs/iter-progress/)
