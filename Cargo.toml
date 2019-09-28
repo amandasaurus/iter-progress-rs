@@ -2,7 +2,7 @@
 authors = ["Rory McCann <rory@technomancy.org>"]
 description = "Calculate progress of your iterators"
 keywords = ["iterator", "iter"]
-license = "GPL-3.0"
+license = "AGPL-3.0"
 name = "iter-progress"
 readme = "README.md"
 repository = "https://github.com/rory/iter-progress-rs"
