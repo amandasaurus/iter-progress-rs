@@ -1,6 +1,7 @@
 ## Unreleased
 
 * Change licence to [Affero GPL licence](LICENCE)
+* Minor documentation improvements
 
 ## v0.4.0 (2017-02-10)
 

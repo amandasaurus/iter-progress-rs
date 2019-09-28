@@ -21,8 +21,10 @@
 //! 
 //! // We can now use methods on `state` to find out about this object
 //!
-//! // 0 to 1
+//! // If we know the size of the iterator, we can query how far we are through it
+//! // How far through the iterator are we. 0 to 1
 //! assert_eq!(state.fraction(), Some(0.001));
+//!
 //! // We are 0.1% the way through
 //! assert_eq!(state.percent(), Some(0.1));
 //! ```
@@ -33,15 +35,18 @@
 //! use iter_progress::ProgressableIter;
 //!
 //! for (state, val) in my_big_vec.iter().progress() {
-//!     state.print_every_n_sec(1. format!("{}% the way though, and doing {} per sec. Currently on item {}", state.percent().unwrap(), state.rate(), val));
+//!     // Every 1 second, execute this function with the the `state`
+//!     state.do_every_n_sec(1. |state| {
+//!        println!("{}% the way though, and doing {} per sec.", state.percent().unwrap(), state.rate()));
+//!     });
 //!
 //!     // Do something to process `val`
 //! }
 //! ```
 //!
-//! 
-//! There are numerous ergnomic methods for access data on the state of the iterator
-//! 
+//! `.do_every_n_sec` is a "best effort" attempt. It's single threaded, so will be called if the
+//! last time that was called was more than N sec ago. `.do_every_n_items` is called every N items.
+
 use std::iter::Iterator;
 use std::time::{Instant, Duration};
 
@@ -76,14 +81,15 @@ impl ProgressRecord {
 
     /// Number of items we've generated so far. Will be 0 for the first element
     ///
-    /// ``
+    /// ```rust
     /// # use iter_progress::ProgressableIter;
     /// let mut progressor = (0..1_000).progress();
     /// let (state, num) = progressor.next().unwrap();
-    /// assert_eq!(state.num_done(), 0);
+    /// assert_eq!(state.num_done(), 1);
     /// ```
     ///
-    /// ```
+    ///
+    /// ```rust
     /// # use iter_progress::ProgressableIter;
     /// let mut progressor = (0..1_000).progress().skip(120);
     /// let (state, num) = progressor.next().unwrap();
@@ -93,7 +99,8 @@ impl ProgressRecord {
         self.num
     }
 
-    /// `Instant` for when the previous record was generated. None if there was no previous record.
+    /// The `Instant` for when the previous record was generated. None if there was no previous
+    /// record.
     /// 
     /// This can be useful for calculating fine grained rates
     pub fn previous_record_tm(&self) -> Option<Instant> {
@@ -135,7 +142,7 @@ impl ProgressRecord {
     /// assert_eq!(state.fraction(), Some(0.121));
     /// ```
     ///
-    /// Returns None if we cannot know, e.g. for an infinite iterator
+    /// Returns `None` if we cannot know, e.g. for an infinite iterator
     /// ```
     /// # use iter_progress::ProgressableIter;
     /// let mut progressor = (0..).progress().skip(120);
@@ -161,7 +168,7 @@ impl ProgressRecord {
     /// assert_eq!(state.percent(), Some(12.1));
     /// ```
     ///
-    /// Returns None if we cannot know, e.g. for an infinite iterator
+    /// Returns `None` if we cannot know, e.g. for an infinite iterator
     /// ```
     /// # use iter_progress::ProgressableIter;
     /// let mut progressor = (0..).progress().skip(120);
@@ -175,7 +182,8 @@ impl ProgressRecord {
         }
     }
 
-    /// Print out `msg`, but only if there has been `n` seconds since last printout
+    /// Print out `msg`, but only if there has been `n` seconds since last printout. (uses
+    /// `print!()`, so newline not included)
     pub fn print_every_n_sec<T: std::fmt::Display>(&self, n: f32, msg: T) {
         if self.should_do_every_n_sec(n) {
             print!("{}", msg);
@@ -190,7 +198,7 @@ impl ProgressRecord {
         }
     }
 
-    /// If we want to print every `n` sec, should we print now?
+    /// If we want to do every `n` sec, should we do it now?
     pub fn should_do_every_n_sec(&self, n: impl Into<f32>) -> bool {
         let n: f32 = n.into();
         // get the secs since start as a f32
@@ -215,7 +223,7 @@ impl ProgressRecord {
         }
     }
 
-    /// If we want to print every `n` items, should we print now?
+    /// If we want to do every `n` items, should we do it now?
     pub fn should_do_every_n_items(&self, n: usize) -> bool {
         (self.num_done() - 1) % n == 0
     }
