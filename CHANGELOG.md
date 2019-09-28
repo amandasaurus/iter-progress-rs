@@ -1,4 +1,4 @@
-## Unreleased
+## v0.5.0 (2019-09-28)
 
 * Change licence to [Affero GPL licence](LICENCE)
 * Minor documentation improvements
