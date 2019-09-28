@@ -285,7 +285,7 @@ pub struct ProgressRecorderIter<I> {
 impl<I: Iterator> ProgressRecorderIter<I> {
     /// Create a new `ProgressRecorderIter` from another iterator.
     pub fn new(iter: I) -> ProgressRecorderIter<I> {
-        ProgressRecorderIter{ iter: iter, count: 0, started_iterating: Instant::now(), recent_times: Vec::with_capacity(5) }
+        ProgressRecorderIter{ iter, count: 0, started_iterating: Instant::now(), recent_times: Vec::with_capacity(5) }
     }
 
     /// Calculate the current `ProgressRecord` for where we are now.
@@ -312,12 +312,13 @@ impl<I: Iterator> ProgressRecorderIter<I> {
         let previous_record_tm = match self.recent_times.len() {
             0 | 1 => { None },
             _ => {
-                self.recent_times.get(self.recent_times.len()-2).map(|t| { t.clone() })
+                self.recent_times.get(self.recent_times.len()-2).copied()
             }
         };
 
         self.count += 1;
-        ProgressRecord{ num: self.count, iterating_for: now - self.started_iterating, size_hint: self.iter.size_hint(), recent_rate: recent_rate, previous_record_tm: previous_record_tm, started_iterating: self.started_iterating }
+
+        ProgressRecord{ num: self.count, iterating_for: now - self.started_iterating, size_hint: self.iter.size_hint(), recent_rate, previous_record_tm, started_iterating: self.started_iterating }
     }
 
     /// Gets the original iterator back
