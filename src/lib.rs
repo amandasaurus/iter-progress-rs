@@ -172,14 +172,15 @@ impl ProgressRecord {
 
     /// Do thing but only every n sec (as far as possible).
     /// Could be a print statement.
-    pub fn do_every_n_sec<F: Fn(&Self)>(&self, n: f32, f: F) {
+    pub fn do_every_n_sec<F: Fn(&Self)>(&self, n: impl Into<f32>, f: F) {
         if self.should_do_every_n_sec(n) {
             f(self);
         }
     }
 
     /// If we want to print every `n` sec, should we print now?
-    pub fn should_do_every_n_sec(&self, n: f32) -> bool {
+    pub fn should_do_every_n_sec(&self, n: impl Into<f32>) -> bool {
+        let n: f32 = n.into();
         // get the secs since start as a f32
         let duration_since_start = self.duration_since_start();
         let secs_since_start: f32 = duration_since_start.as_secs() as f32 + duration_since_start.subsec_nanos() as f32 / 1_000_000_000.0;
