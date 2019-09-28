@@ -26,6 +26,19 @@
 //! // We are 0.1% the way through
 //! assert_eq!(state.percent(), Some(0.1));
 //! ```
+//!
+//! Another usage:
+//!
+//! ```compile_fail
+//! use iter_progress::ProgressableIter;
+//!
+//! for (state, val) in my_big_vec.iter().progress() {
+//!     state.print_every_n_sec(1. format!("{}% the way though, and doing {} per sec. Currently on item {}", state.percent().unwrap(), state.rate(), val));
+//!
+//!     // Do something to process `val`
+//! }
+//! ```
+//!
 //! 
 //! There are numerous ergnomic methods for access data on the state of the iterator
 //! 
