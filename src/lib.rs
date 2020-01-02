@@ -62,13 +62,14 @@ pub struct ProgressRecord {
 
     size_hint: (usize, Option<usize>),
 
-    recent_rate: f32,
-
     /// The timestamp of when the previous record was created. Will be None if this is first.
     previous_record_tm: Option<Instant>,
 
     /// When the iteration started
     started_iterating: Instant,
+
+    rolling_average_duration: Option<Duration>,
+    exp_average_duration: Option<Duration>,
 
 }
 
@@ -122,14 +123,14 @@ impl ProgressRecord {
     /// Currently looks likt "{time_since_start} - Seen {num_see} Rate {rate}/sec", but the library
     /// might change it later. Construct your own message.
     pub fn message(&self) -> String {
-        format!("{} - Seen {} Rate {}/sec", self.duration_since_start().as_secs(), self.num_done(), self.recent_rate())
+        format!("{} - Seen {} Rate {}/sec", self.duration_since_start().as_secs(), self.num_done(), self.rate())
     }
 
     /// Number of items per second, calcualted from the start
-    pub fn rate(&self) -> f32 {
+    pub fn rate(&self) -> f64 {
         // number of items per second
         let duration_since_start = self.duration_since_start();
-        (self.num_done() as f32) / (duration_since_start.as_secs() as f32)
+        (self.num_done() as f64) / duration_since_start.as_secs_f64()
     }
 
     /// How far through the iterator as a fraction, if known
@@ -267,9 +268,20 @@ impl ProgressRecord {
         }
     }
 
-    /// The rate of the last few items.
-    pub fn recent_rate(&self) -> f32 {
-        self.recent_rate
+    pub fn rolling_average_duration(&self) -> &Option<Duration> {
+        &self.rolling_average_duration
+    }
+
+    pub fn rolling_average_rate(&self) -> Option<f64> {
+        self.rolling_average_duration.map(|d| 1./d.as_secs_f64())
+    }
+
+    pub fn exp_average_duration(&self) -> &Option<Duration> {
+        &self.exp_average_duration
+    }
+
+    pub fn exp_average_rate(&self) -> Option<f64> {
+        self.exp_average_duration.map(|d| 1./d.as_secs_f64())
     }
 
 }
@@ -286,14 +298,35 @@ pub struct ProgressRecorderIter<I> {
     /// When did we start iterating
     started_iterating: Instant,
 
-    /// Keeps track of recent times
-    recent_times: Vec<Instant>
+    previous_record_tm: Option<Instant>,
+
+    rolling_average: Option<(usize, Vec<f64>)>,
+    exp_average: Option<(f64, Option<Duration>)>,
 }
 
 impl<I: Iterator> ProgressRecorderIter<I> {
     /// Create a new `ProgressRecorderIter` from another iterator.
     pub fn new(iter: I) -> ProgressRecorderIter<I> {
-        ProgressRecorderIter{ iter, count: 0, started_iterating: Instant::now(), recent_times: Vec::with_capacity(5) }
+        ProgressRecorderIter{
+            iter,
+            count: 0,
+            started_iterating: Instant::now(),
+            previous_record_tm: None,
+            rolling_average: None,
+            exp_average: None,
+        }
+    }
+
+    pub fn with_rolling_average(self, size: usize) -> Self {
+        let mut res = self;
+        res.rolling_average = Some((size, vec![0.; size]));
+        res
+    }
+
+    pub fn with_exp_average(self, rate: f64) -> Self {
+        let mut res = self;
+        res.exp_average = Some((rate, None));
+        res
     }
 
     /// Calculate the current `ProgressRecord` for where we are now.
@@ -301,32 +334,54 @@ impl<I: Iterator> ProgressRecorderIter<I> {
         // recent_times is a vec of times, with newer times at the end. However it'll always be <
         // 100 elements long.
         let now = Instant::now();
-        self.recent_times.push(now);
-        while self.recent_times.len() > 100 {
-            self.recent_times.remove(0);
-        }
-
-        let recent_rate = match self.recent_times.get(0) {
-            None => ::std::f32::INFINITY,
-            Some(&first) => {
-                let dur = now - first;
-                (self.recent_times.len() as f32 ) / (dur.as_secs() as f32)
-            },
-        };
-
-        // last element of recent_times will be the current time, for this record. so second last
-        // will be the previous time. In python we'd do [-1] for the last, and [-2] for second
-        // last.
-        let previous_record_tm = match self.recent_times.len() {
-            0 | 1 => { None },
-            _ => {
-                self.recent_times.get(self.recent_times.len()-2).copied()
-            }
-        };
 
         self.count += 1;
 
-        ProgressRecord{ num: self.count, iterating_for: now - self.started_iterating, size_hint: self.iter.size_hint(), recent_rate, previous_record_tm, started_iterating: self.started_iterating }
+        let exp_average_rate = if let Some((rate, last)) = self.exp_average {
+            if let Some(previous_tm) = self.previous_record_tm {
+                let this_duration = now - previous_tm;
+                let current_ema = match last {
+                    None => this_duration,
+                    Some(last) => this_duration.mul_f64(rate) + last.mul_f64(1. - rate)
+                };
+                self.exp_average = Some((rate, Some(current_ema)));
+                Some(current_ema)
+            } else {
+                None
+            }
+        } else { None };
+
+        let rolling_average_duration = match &mut self.rolling_average {
+            None => None,
+            Some((size, values)) => {
+                if let Some(previous_tm) = self.previous_record_tm {
+                    let this_duration = (now - previous_tm).as_secs_f64();
+                    values[self.count % *size] = this_duration;
+                    if self.count < *size {
+                        // We haven't filled up the buffer yet
+                        Some(Duration::from_secs_f64(values[0..=self.count].iter().sum::<f64>()/(self.count as f64)))
+                    } else {
+                        Some(Duration::from_secs_f64(values.iter().sum::<f64>()/(*size as f64)))
+                    }
+                } else {
+                    None
+                }
+            }
+        };
+
+        let res = ProgressRecord{
+            num: self.count,
+            iterating_for: now - self.started_iterating,
+            size_hint: self.iter.size_hint(),
+            started_iterating: self.started_iterating,
+            previous_record_tm: self.previous_record_tm.clone(),
+            rolling_average_duration: rolling_average_duration,
+            exp_average_duration: exp_average_rate,
+        };
+
+        self.previous_record_tm = Some(now);
+
+        res
     }
 
     /// Gets the original iterator back
