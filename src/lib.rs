@@ -60,7 +60,11 @@ pub struct ProgressRecord {
     /// How long since we started iterating.
     iterating_for: Duration,
 
+    /// Value of underlying iterator's `.size_hint()`
     size_hint: (usize, Option<usize>),
+
+    /// If `.assumed_size(...)` was set on `ProgressableIter`, return that.
+    assumed_size: Option<usize>,
 
     /// The timestamp of when the previous record was created. Will be None if this is first.
     previous_record_tm: Option<Instant>,
@@ -68,7 +72,10 @@ pub struct ProgressRecord {
     /// When the iteration started
     started_iterating: Instant,
 
+    /// The rolling average duration, if calculated
     rolling_average_duration: Option<Duration>,
+
+    /// The exponential average duration, if calculated
     exp_average_duration: Option<Duration>,
 
 }
@@ -103,37 +110,25 @@ impl ProgressRecord {
     /// The `Instant` for when the previous record was generated. None if there was no previous
     /// record.
     /// 
-    /// This can be useful for calculating fine grained rates
+    /// This can be useful for calculating fine-grained rates
     pub fn previous_record_tm(&self) -> Option<Instant> {
         self.previous_record_tm
     }
 
-    /// When the iteration started
+    /// Return the time `Instant` that this iterator started
     pub fn started_iterating(&self) -> Instant {
         self.started_iterating
     }
 
-    /// Prints a basic message
-    pub fn print_message(&self) {
-        println!("{}", self.message());
-    }
-
-    /// Returns a basic log message of where we are now. You can construct this yourself, but this
-    /// is a helpful convience method.
-    /// Currently looks likt "{time_since_start} - Seen {num_see} Rate {rate}/sec", but the library
-    /// might change it later. Construct your own message.
-    pub fn message(&self) -> String {
-        format!("{} - Seen {} Rate {}/sec", self.duration_since_start().as_secs(), self.num_done(), self.rate())
-    }
-
-    /// Number of items per second, calcualted from the start
+    /// Number of items per second, calculated from the start
     pub fn rate(&self) -> f64 {
         // number of items per second
-        let duration_since_start = self.duration_since_start();
-        (self.num_done() as f64) / duration_since_start.as_secs_f64()
+        (self.num_done() as f64) / self.duration_since_start().as_secs_f64()
     }
 
-    /// How far through the iterator as a fraction, if known
+    /// How far through the iterator as a fraction, if known.
+    /// Uses the underlying iterator's `.size_hint()` method if that is an exact value, falling
+    /// back to any assumed size (set with `.assume_size(...)`). Otherwise returns `None`.
     ///
     /// ```
     /// use iter_progress::ProgressableIter;
@@ -150,14 +145,24 @@ impl ProgressRecord {
     /// let (state, num) = progressor.next().unwrap();
     /// assert_eq!(state.fraction(), None);
     /// ```
-    pub fn fraction(&self) -> Option<f32> {
-        if self.is_size_known() {
-            let remaining = self.size_hint.0;
-            let done = self.num_done();
-            Some(( done as f32 ) / ( (remaining+done) as f32 ))
+    pub fn fraction(&self) -> Option<f64> {
+        let total = if self.size_hint.1 == Some(self.size_hint.0) {
+            // use that directly
+            Some(self.size_hint.0 + self.num_done())
+        } else if self.assumed_size.is_some() {
+            self.assumed_size
         } else {
             None
+        };
+
+        match total {
+            None => None,
+            Some(total) => {
+                let done = self.num_done();
+                Some(( done as f64 ) / ( total as f64 ))
+            }
         }
+
     }
 
     /// Percentage progress through the iterator, if known.
@@ -176,11 +181,8 @@ impl ProgressRecord {
     /// let (state, num) = progressor.next().unwrap();
     /// assert_eq!(state.percent(), None);
     /// ```
-    pub fn percent(&self) -> Option<f32> {
-        match self.fraction() {
-            None => { None }
-            Some(f) => { Some(f * 100.0) }
-        }
+    pub fn percent(&self) -> Option<f64> {
+        self.fraction().map(|f| f*100.)
     }
 
     /// Print out `msg`, but only if there has been `n` seconds since last printout. (uses
@@ -191,7 +193,7 @@ impl ProgressRecord {
         }
     }
 
-    /// Do thing but only every n sec (as far as possible).
+    /// Call this function, but only every n sec (as close as possible).
     /// Could be a print statement.
     pub fn do_every_n_sec<F: Fn(&Self)>(&self, n: impl Into<f32>, f: F) {
         if self.should_do_every_n_sec(n) {
@@ -259,29 +261,42 @@ impl ProgressRecord {
         }
     }
 
-    /// Do we know how big this iterator is?
-    /// False iff there is some ambiguity/unknown
-    fn is_size_known(&self) -> bool {
-        match self.size_hint.1 {
-            None => { false },
-            Some(x) => { self.size_hint.0 == x },
-        }
-    }
 
+    /// Rolling average time to process each item this iterator is processing if it is recording
+    /// that. None if it's not being recorded, or it's too soon to know (e.g. for the first item).
     pub fn rolling_average_duration(&self) -> &Option<Duration> {
         &self.rolling_average_duration
     }
 
+    /// Rolling average number of items per second this iterator is processing if it is recording
+    /// that. None if it's not being recorded, or it's too soon to know (e.g. for the first item).
     pub fn rolling_average_rate(&self) -> Option<f64> {
         self.rolling_average_duration.map(|d| 1./d.as_secs_f64())
     }
 
+    /// Exponential average time to process each item this iterator is processing if it is recording
+    /// that. None if it's not being recorded, or it's too soon to know (e.g. for the first item).
     pub fn exp_average_duration(&self) -> &Option<Duration> {
         &self.exp_average_duration
     }
 
+    /// Exponential average number of items per second this iterator is processing if it is recording
+    /// that. None if it's not being recorded, or it's too soon to know (e.g. for the first item).
     pub fn exp_average_rate(&self) -> Option<f64> {
         self.exp_average_duration.map(|d| 1./d.as_secs_f64())
+    }
+
+    /// If the total size is know (i.e. we know the `.fraction()`), calculate the estimated time
+    /// to arrival, i.e. how long before this is finished.
+    pub fn eta(&self) -> Option<Duration> {
+        self.fraction().map(|f|
+            self.duration_since_start().div_f64(f) - self.duration_since_start())
+    }
+
+    /// If the total size is know (i.e. we know the `.fraction()`), calculate how long, in total,
+    /// this iterator would run for. i.e. how long it's run plus how much longer it has left
+    pub fn estimated_total_time(&self) -> Option<Duration> {
+        self.fraction().map(|f| self.duration_since_start().div_f64(f))
     }
 
 }
@@ -302,6 +317,7 @@ pub struct ProgressRecorderIter<I> {
 
     rolling_average: Option<(usize, Vec<f64>)>,
     exp_average: Option<(f64, Option<Duration>)>,
+    assumed_size: Option<usize>,
 }
 
 impl<I: Iterator> ProgressRecorderIter<I> {
@@ -314,19 +330,37 @@ impl<I: Iterator> ProgressRecorderIter<I> {
             previous_record_tm: None,
             rolling_average: None,
             exp_average: None,
+            assumed_size: None,
         }
     }
 
-    pub fn with_rolling_average(self, size: usize) -> Self {
+    /// Set the desired size of the rolling average window calculation (if any). `None` to
+    /// disable.
+    /// Larger values slow down each iteration (since the rolling average is calculated each
+    /// iteration).
+    pub fn with_rolling_average(self, size: impl Into<Option<usize>>) -> Self {
         let mut res = self;
-        res.rolling_average = Some((size, vec![0.; size]));
+        res.rolling_average = size.into().map(|size| (size, vec![0.; size]) );
         res
     }
 
-    pub fn with_exp_average(self, rate: f64) -> Self {
+    /// Set the desired exponential rate
+    /// 0.001 is a good value.
+    pub fn with_exp_average(self, rate: impl Into<Option<f64>>) -> Self {
         let mut res = self;
-        res.exp_average = Some((rate, None));
+        res.exp_average = rate.into().map(|rate| (rate, None) );
         res
+    }
+
+    /// Add an 'assumed size' to this iterator. If the iterator doesn't return an exact value for
+    /// `.size_hint()`, you can use this to override
+    /// the `.size_hint()` from the iterator will override this if it returns an exact size (i.e.
+    /// `.size_hint().1 == Some(...size_hint().0).
+    /// Set to `None` to undo this.
+    pub fn assume_size(self, size: impl Into<Option<usize>>) -> Self {
+        let mut new = self;
+        new.assumed_size = size.into();
+        new
     }
 
     /// Calculate the current `ProgressRecord` for where we are now.
@@ -373,6 +407,7 @@ impl<I: Iterator> ProgressRecorderIter<I> {
             num: self.count,
             iterating_for: now - self.started_iterating,
             size_hint: self.iter.size_hint(),
+            assumed_size: self.assumed_size,
             started_iterating: self.started_iterating,
             previous_record_tm: self.previous_record_tm.clone(),
             rolling_average_duration: rolling_average_duration,
@@ -384,7 +419,12 @@ impl<I: Iterator> ProgressRecorderIter<I> {
         res
     }
 
-    /// Gets the original iterator back
+    /// Returns referend to the inner iterator
+    pub fn inner(&self) -> &I {
+        &self.iter
+    }
+
+    /// Gets the original iterator back, consuming this.
     pub fn into_inner(self) -> I {
         self.iter
     }
@@ -406,7 +446,6 @@ impl<I> ProgressableIter<I> for I where I: Iterator {
 
 impl<I> Iterator for ProgressRecorderIter<I> where I: Iterator {
     type Item = (ProgressRecord, <I as Iterator>::Item);
-
 
     #[inline]
     fn next(&mut self) -> Option<(ProgressRecord, <I as Iterator>::Item)> {
@@ -440,13 +479,11 @@ mod test {
 
         sleep(Duration::from_millis(500));
         let (state, _) = progressor.next().unwrap();
-        assert_eq!(state.message(), "0 - Seen 1 Rate inf/sec");
         // It'll always print on the first one
         assert_eq!(state.should_do_every_n_items(2), true);
         assert_eq!(state.should_do_every_n_items(3), true);
         assert_eq!(state.should_do_every_n_items(5), true);
-        assert_eq!(state.rate(), ::std::f32::INFINITY);
-        assert_eq!(state.recent_rate(), ::std::f32::INFINITY);
+        assert_eq!(state.rate(), ::std::f64::INFINITY);
         // First run, so there should be nothing here
         assert!(state.previous_record_tm().is_none());
 
@@ -458,12 +495,10 @@ mod test {
         sleep(Duration::from_millis(500));
 
         let (state, _) = progressor.next().unwrap();
-        assert_eq!(state.message(), "1 - Seen 2 Rate inf/sec");
         assert_eq!(state.should_do_every_n_items(2), false);
         assert_eq!(state.should_do_every_n_items(3), false);
         assert_eq!(state.should_do_every_n_items(5), false);
         assert_eq!(state.rate(), 2.);
-        //assert_eq!(state.recent_rate(), 2.);
         // This'll be the time for the first one
         assert!(state.previous_record_tm().is_some());
         let since_last_time = state.previous_record_tm().unwrap().elapsed();
@@ -475,12 +510,10 @@ mod test {
 
         sleep(Duration::from_millis(500));
         let (state, _) = progressor.next().unwrap();
-        assert_eq!(state.message(), "1 - Seen 3 Rate 3/sec");
         assert_eq!(state.should_do_every_n_items(2), true);
         assert_eq!(state.should_do_every_n_items(3), false);
         assert_eq!(state.should_do_every_n_items(5), false);
         assert_eq!(state.rate(), 3.);
-        assert_eq!(state.recent_rate(), 3.);
         assert_eq!(state.should_do_every_n_sec(1.), false);
         assert_eq!(state.should_do_every_n_sec(2.), false);
         assert_eq!(state.should_do_every_n_sec(0.8), false);
@@ -488,12 +521,10 @@ mod test {
 
         sleep(Duration::from_millis(500));
         let (state, _) = progressor.next().unwrap();
-        assert_eq!(state.message(), "2 - Seen 4 Rate 4/sec");
         assert_eq!(state.should_do_every_n_items(2), false);
         assert_eq!(state.should_do_every_n_items(3), true);
         assert_eq!(state.should_do_every_n_items(5), false);
         assert_eq!(state.rate(), 2.);
-        assert_eq!(state.recent_rate(), 4.);
     }
 
     #[test]

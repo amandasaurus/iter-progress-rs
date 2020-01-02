@@ -1,3 +1,13 @@
+## Unreleased
+
+* Replace `.recent_rate()` with exponential & rolling average functionality
+* Remove `.message()`, please write your own message
+* Added `.assume_total(usize)` functionality, allowing you to use this total as final fall back
+* Use `f64` instead of `f32` in some place (e.g. `.fraction()`)
+* Added `.eta()` & `.estimated_total_time()` methods to retrieve that when the
+  total is estimatable.
+* Minor internal code clean ups
+
 ## v0.5.0 (2019-09-28)
 
 * Change licence to [Affero GPL licence](LICENCE)
