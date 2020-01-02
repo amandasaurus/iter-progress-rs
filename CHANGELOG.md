@@ -1,4 +1,4 @@
-## Unreleased
+## v0.6.0 (2020-01-02)
 
 * Replace `.recent_rate()` with exponential & rolling average functionality
 * Remove `.message()`, please write your own message
