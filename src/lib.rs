@@ -483,7 +483,7 @@ mod test {
         assert_eq!(state.should_do_every_n_items(2), true);
         assert_eq!(state.should_do_every_n_items(3), true);
         assert_eq!(state.should_do_every_n_items(5), true);
-        assert_eq!(state.rate(), ::std::f64::INFINITY);
+        assert_eq!((state.rate()*100.).round(), 200.);
         // First run, so there should be nothing here
         assert!(state.previous_record_tm().is_none());
 
@@ -498,7 +498,7 @@ mod test {
         assert_eq!(state.should_do_every_n_items(2), false);
         assert_eq!(state.should_do_every_n_items(3), false);
         assert_eq!(state.should_do_every_n_items(5), false);
-        assert_eq!(state.rate(), 2.);
+        assert_eq!(state.rate().round(), 2.);
         // This'll be the time for the first one
         assert!(state.previous_record_tm().is_some());
         let since_last_time = state.previous_record_tm().unwrap().elapsed();
@@ -513,7 +513,7 @@ mod test {
         assert_eq!(state.should_do_every_n_items(2), true);
         assert_eq!(state.should_do_every_n_items(3), false);
         assert_eq!(state.should_do_every_n_items(5), false);
-        assert_eq!(state.rate(), 3.);
+        assert_eq!(state.rate().round(), 2.);
         assert_eq!(state.should_do_every_n_sec(1.), false);
         assert_eq!(state.should_do_every_n_sec(2.), false);
         assert_eq!(state.should_do_every_n_sec(0.8), false);
@@ -524,7 +524,7 @@ mod test {
         assert_eq!(state.should_do_every_n_items(2), false);
         assert_eq!(state.should_do_every_n_items(3), true);
         assert_eq!(state.should_do_every_n_items(5), false);
-        assert_eq!(state.rate(), 2.);
+        assert_eq!(state.rate().round(), 2.);
     }
 
     #[test]
