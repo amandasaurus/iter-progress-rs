@@ -66,6 +66,9 @@ pub struct ProgressRecord {
     /// If `.assumed_size(...)` was set on `ProgressableIter`, return that.
     assumed_size: Option<usize>,
 
+    /// If we have overridden the calculated fraction
+    assumed_fraction: Option<f64>,
+
     /// The timestamp of when the previous record was created. Will be None if this is first.
     previous_record_tm: Option<Instant>,
 
@@ -127,6 +130,7 @@ impl ProgressRecord {
     }
 
     /// How far through the iterator as a fraction, if known.
+    /// First looks at the `assumed_fraction` if you have overridden that.
     /// Uses the underlying iterator's `.size_hint()` method if that is an exact value, falling
     /// back to any assumed size (set with `.assume_size(...)`). Otherwise returns `None`.
     ///
@@ -146,6 +150,10 @@ impl ProgressRecord {
     /// assert_eq!(state.fraction(), None);
     /// ```
     pub fn fraction(&self) -> Option<f64> {
+        if self.assumed_fraction.is_some() {
+            return self.assumed_fraction
+        }
+
         let total = if self.size_hint.1 == Some(self.size_hint.0) {
             // use that directly
             Some(self.size_hint.0 + self.num_done())
@@ -162,7 +170,11 @@ impl ProgressRecord {
                 Some(( done as f64 ) / ( total as f64 ))
             }
         }
+    }
 
+    /// Assume that this is actually at this fraction through
+    pub fn assume_fraction(&mut self, f: impl Into<f64>) {
+        self.assumed_fraction = Some(f.into())
     }
 
     /// Percentage progress through the iterator, if known.
@@ -408,6 +420,7 @@ impl<I: Iterator> ProgressRecorderIter<I> {
             iterating_for: now - self.started_iterating,
             size_hint: self.iter.size_hint(),
             assumed_size: self.assumed_size,
+            assumed_fraction: None,
             started_iterating: self.started_iterating,
             previous_record_tm: self.previous_record_tm.clone(),
             rolling_average_duration: rolling_average_duration,
@@ -547,6 +560,38 @@ mod test {
         let (state, val) = progressor.next().unwrap();
         assert_eq!(val, 0);
         assert_eq!(state.fraction(), None);
+        let (state, val) = progressor.next().unwrap();
+        assert_eq!(val, 1);
+        assert_eq!(state.fraction(), None);
+
+    }
+
+
+    #[test]
+    fn assume_fraction1() {
+        use super::ProgressableIter;
+
+        let vec: Vec<u8> = vec![0, 1, 2, 3, 4];
+        let mut progressor = vec.iter().progress();
+
+        let (mut state, _) = progressor.next().unwrap();
+        assert_eq!(state.fraction(), Some(0.2));
+        assert_eq!(state.percent(), Some(20.));
+        state.assume_fraction(0.5);
+        assert_eq!(state.fraction(), Some(0.5));
+        assert_eq!(state.percent(), Some(50.));
+
+        let (state, _) = progressor.next().unwrap();
+        assert_eq!(state.fraction(), Some(0.4));
+        assert_eq!(state.percent(), Some(40.));
+
+        let mut progressor = (0..).progress();
+
+        let (mut state, val) = progressor.next().unwrap();
+        assert_eq!(val, 0);
+        assert_eq!(state.fraction(), None);
+        state.assume_fraction(0.2);
+        assert_eq!(state.fraction(), Some(0.2));
         let (state, val) = progressor.next().unwrap();
         assert_eq!(val, 1);
         assert_eq!(state.fraction(), None);
