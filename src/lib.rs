@@ -18,7 +18,7 @@
 //! // the iterator
 //! let (state, number) = progressor.next().unwrap();
 //! assert_eq!(number, 0);
-//! 
+//!
 //! // We can now use methods on `state` to find out about this object
 //!
 //! // If we know the size of the iterator, we can query how far we are through it
@@ -109,7 +109,7 @@ impl ProgressRecord {
 
     /// The `Instant` for when the previous record was generated. None if there was no previous
     /// record.
-    /// 
+    ///
     /// This can be useful for calculating fine-grained rates
     pub fn previous_record_tm(&self) -> Option<Instant> {
         self.previous_record_tm
