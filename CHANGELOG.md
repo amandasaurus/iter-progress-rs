@@ -1,4 +1,4 @@
-## Unreleased
+## v0.7.0 (2020-06-12)
 
 * State gets `.assume_fraction(…)` for when you want to force a specific fraction value
 
