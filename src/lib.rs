@@ -422,8 +422,8 @@ impl<I: Iterator> ProgressRecorderIter<I> {
             assumed_size: self.assumed_size,
             assumed_fraction: None,
             started_iterating: self.started_iterating,
-            previous_record_tm: self.previous_record_tm.clone(),
-            rolling_average_duration: rolling_average_duration,
+            previous_record_tm: self.previous_record_tm,
+            rolling_average_duration,
             exp_average_duration: exp_average_rate,
         };
 
