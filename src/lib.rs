@@ -377,8 +377,6 @@ impl<I: Iterator> ProgressRecorderIter<I> {
 
     /// Calculate the current `ProgressRecord` for where we are now.
     fn generate_record(&mut self) -> ProgressRecord {
-        // recent_times is a vec of times, with newer times at the end. However it'll always be <
-        // 100 elements long.
         let now = Instant::now();
 
         self.count += 1;
