@@ -53,6 +53,7 @@ use std::time::{Instant, Duration};
 
 /// Every step of the underlying iterator, one of these is generated. It contains all the
 /// information of how this iterator is progresing. Use the methods to access data on it.
+#[derive(Debug)]
 pub struct ProgressRecord {
 
     /// How many elements before this
