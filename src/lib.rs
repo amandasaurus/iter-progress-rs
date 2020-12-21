@@ -49,13 +49,12 @@
 //! last time that was called was more than N sec ago. `.do_every_n_items` is called every N items.
 
 use std::iter::Iterator;
-use std::time::{Instant, Duration};
+use std::time::{Duration, Instant};
 
 /// Every step of the underlying iterator, one of these is generated. It contains all the
 /// information of how this iterator is progresing. Use the methods to access data on it.
 #[derive(Debug)]
 pub struct ProgressRecord {
-
     /// How many elements before this
     num: usize,
 
@@ -82,11 +81,9 @@ pub struct ProgressRecord {
 
     /// The exponential average duration, if calculated
     exp_average_duration: Option<Duration>,
-
 }
 
 impl ProgressRecord {
-
     /// Duration since iteration started
     pub fn duration_since_start(&self) -> Duration {
         self.iterating_for
@@ -153,7 +150,7 @@ impl ProgressRecord {
     /// ```
     pub fn fraction(&self) -> Option<f64> {
         if self.assumed_fraction.is_some() {
-            return self.assumed_fraction
+            return self.assumed_fraction;
         }
 
         let total = if self.size_hint.1 == Some(self.size_hint.0) {
@@ -169,7 +166,7 @@ impl ProgressRecord {
             None => None,
             Some(total) => {
                 let done = self.num_done();
-                Some(( done as f64 ) / ( total as f64 ))
+                Some((done as f64) / (total as f64))
             }
         }
     }
@@ -196,7 +193,7 @@ impl ProgressRecord {
     /// assert_eq!(state.percent(), None);
     /// ```
     pub fn percent(&self) -> Option<f64> {
-        self.fraction().map(|f| f*100.)
+        self.fraction().map(|f| f * 100.)
     }
 
     /// Print out `msg`, but only if there has been `n` seconds since last printout. (uses
@@ -220,23 +217,25 @@ impl ProgressRecord {
         let n: f32 = n.into();
         // get the secs since start as a f32
         let duration_since_start = self.duration_since_start();
-        let secs_since_start: f32 = duration_since_start.as_secs() as f32 + duration_since_start.subsec_nanos() as f32 / 1_000_000_000.0;
+        let secs_since_start: f32 = duration_since_start.as_secs() as f32
+            + duration_since_start.subsec_nanos() as f32 / 1_000_000_000.0;
 
         match self.previous_record_tm() {
             None => {
                 // This iteration is the first time, so we should print if more than `n` seconds
                 // have gone past
                 secs_since_start > n
-            },
+            }
             Some(last_time) => {
                 let last_time_offset = last_time - self.started_iterating();
-                let last_time_offset: f32 = last_time_offset.as_secs() as f32 + last_time_offset.subsec_nanos() as f32 / 1_000_000_000.0;
+                let last_time_offset: f32 = last_time_offset.as_secs() as f32
+                    + last_time_offset.subsec_nanos() as f32 / 1_000_000_000.0;
 
                 let current_step = secs_since_start / n;
                 let last_step = last_time_offset / n;
 
                 current_step.trunc() > last_step.trunc()
-            },
+            }
         }
     }
 
@@ -244,7 +243,6 @@ impl ProgressRecord {
     pub fn should_do_every_n_items(&self, n: usize) -> bool {
         (self.num_done() - 1) % n == 0
     }
-
 
     /// Print out `msg`, but only if there has been `n` items.
     /// Often you want to print out a debug message every 1,000 items or so. This function does
@@ -275,7 +273,6 @@ impl ProgressRecord {
         }
     }
 
-
     /// Rolling average time to process each item this iterator is processing if it is recording
     /// that. None if it's not being recorded, or it's too soon to know (e.g. for the first item).
     pub fn rolling_average_duration(&self) -> &Option<Duration> {
@@ -285,7 +282,7 @@ impl ProgressRecord {
     /// Rolling average number of items per second this iterator is processing if it is recording
     /// that. None if it's not being recorded, or it's too soon to know (e.g. for the first item).
     pub fn rolling_average_rate(&self) -> Option<f64> {
-        self.rolling_average_duration.map(|d| 1./d.as_secs_f64())
+        self.rolling_average_duration.map(|d| 1. / d.as_secs_f64())
     }
 
     /// Exponential average time to process each item this iterator is processing if it is recording
@@ -297,32 +294,32 @@ impl ProgressRecord {
     /// Exponential average number of items per second this iterator is processing if it is recording
     /// that. None if it's not being recorded, or it's too soon to know (e.g. for the first item).
     pub fn exp_average_rate(&self) -> Option<f64> {
-        self.exp_average_duration.map(|d| 1./d.as_secs_f64())
+        self.exp_average_duration.map(|d| 1. / d.as_secs_f64())
     }
 
     /// If the total size is know (i.e. we know the `.fraction()`), calculate the estimated time
     /// to arrival, i.e. how long before this is finished.
     pub fn eta(&self) -> Option<Duration> {
-        self.fraction().map(|f|
-            self.duration_since_start().div_f64(f) - self.duration_since_start())
+        self.fraction()
+            .map(|f| self.duration_since_start().div_f64(f) - self.duration_since_start())
     }
 
     /// If the total size is know (i.e. we know the `.fraction()`), calculate how long, in total,
     /// this iterator would run for. i.e. how long it's run plus how much longer it has left
     pub fn estimated_total_time(&self) -> Option<Duration> {
-        self.fraction().map(|f| self.duration_since_start().div_f64(f))
+        self.fraction()
+            .map(|f| self.duration_since_start().div_f64(f))
     }
-
 }
 
-/// Wraps an iterator and keeps track of state used for `ProgressRecord`'s
-pub struct ProgressRecorderIter<I> {
-
+pub struct OptionalProgressRecorderIter<I> {
     /// The iterator that we are iteating on
     iter: I,
 
     /// How many items have been seen
     count: usize,
+
+    generate_every_count: usize,
 
     /// When did we start iterating
     started_iterating: Instant,
@@ -334,12 +331,74 @@ pub struct ProgressRecorderIter<I> {
     assumed_size: Option<usize>,
 }
 
+/// Wraps an iterator and keeps track of state used for `ProgressRecord`'s
+pub struct ProgressRecorderIter<I>(OptionalProgressRecorderIter<I>);
+
+impl<I> AsRef<OptionalProgressRecorderIter<I>> for ProgressRecorderIter<I> {
+    fn as_ref(&self) -> &OptionalProgressRecorderIter<I> {
+        &self.0
+    }
+}
+
+impl<I> AsMut<OptionalProgressRecorderIter<I>> for ProgressRecorderIter<I> {
+    fn as_mut(&mut self) -> &mut OptionalProgressRecorderIter<I> {
+        &mut self.0
+    }
+}
+
 impl<I: Iterator> ProgressRecorderIter<I> {
     /// Create a new `ProgressRecorderIter` from another iterator.
     pub fn new(iter: I) -> ProgressRecorderIter<I> {
-        ProgressRecorderIter{
+        ProgressRecorderIter(OptionalProgressRecorderIter::new(iter, 1))
+    }
+}
+
+/// An iterator that records it's progress as it goes along
+pub trait ProgressableIter<I> {
+    fn progress(self) -> ProgressRecorderIter<I>;
+}
+
+impl<I> ProgressableIter<I> for I
+where
+    I: Iterator,
+{
+    /// Convert an iterator into a `ProgressRecorderIter`.
+    fn progress(self) -> ProgressRecorderIter<I> {
+        ProgressRecorderIter::new(self)
+    }
+}
+
+impl<I> Iterator for ProgressRecorderIter<I>
+where
+    I: Iterator,
+{
+    type Item = (ProgressRecord, <I as Iterator>::Item);
+
+    #[inline]
+    fn next(&mut self) -> Option<(ProgressRecord, <I as Iterator>::Item)> {
+        self.0.iter.next().map(|a| {
+            // we know there is always a record generated
+            (self.0.generate_record().unwrap(), a)
+        })
+    }
+
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.0.iter.size_hint()
+    }
+
+    #[inline]
+    fn count(self) -> usize {
+        self.0.iter.count()
+    }
+}
+
+impl<I: Iterator> OptionalProgressRecorderIter<I> {
+    pub fn new(iter: I, generate_every_count: usize) -> OptionalProgressRecorderIter<I> {
+        OptionalProgressRecorderIter {
             iter,
             count: 0,
+            generate_every_count,
             started_iterating: Instant::now(),
             previous_record_tm: None,
             rolling_average: None,
@@ -354,7 +413,7 @@ impl<I: Iterator> ProgressRecorderIter<I> {
     /// iteration).
     pub fn with_rolling_average(self, size: impl Into<Option<usize>>) -> Self {
         let mut res = self;
-        res.rolling_average = size.into().map(|size| (size, vec![0.; size]) );
+        res.rolling_average = size.into().map(|size| (size, vec![0.; size]));
         res
     }
 
@@ -362,7 +421,7 @@ impl<I: Iterator> ProgressRecorderIter<I> {
     /// 0.001 is a good value.
     pub fn with_exp_average(self, rate: impl Into<Option<f64>>) -> Self {
         let mut res = self;
-        res.exp_average = rate.into().map(|rate| (rate, None) );
+        res.exp_average = rate.into().map(|rate| (rate, None));
         res
     }
 
@@ -378,24 +437,29 @@ impl<I: Iterator> ProgressRecorderIter<I> {
     }
 
     /// Calculate the current `ProgressRecord` for where we are now.
-    fn generate_record(&mut self) -> ProgressRecord {
-        let now = Instant::now();
-
+    fn generate_record(&mut self) -> Option<ProgressRecord> {
         self.count += 1;
+        if self.count % self.generate_every_count != 0 {
+            return None;
+        }
+
+        let now = Instant::now();
 
         let exp_average_rate = if let Some((rate, last)) = self.exp_average {
             if let Some(previous_tm) = self.previous_record_tm {
                 let this_duration = now - previous_tm;
                 let current_ema = match last {
                     None => this_duration,
-                    Some(last) => this_duration.mul_f64(rate) + last.mul_f64(1. - rate)
+                    Some(last) => this_duration.mul_f64(rate) + last.mul_f64(1. - rate),
                 };
                 self.exp_average = Some((rate, Some(current_ema)));
                 Some(current_ema)
             } else {
                 None
             }
-        } else { None };
+        } else {
+            None
+        };
 
         let rolling_average_duration = match &mut self.rolling_average {
             None => None,
@@ -405,9 +469,13 @@ impl<I: Iterator> ProgressRecorderIter<I> {
                     values[self.count % *size] = this_duration;
                     if self.count < *size {
                         // We haven't filled up the buffer yet
-                        Some(Duration::from_secs_f64(values[0..=self.count].iter().sum::<f64>()/(self.count as f64)))
+                        Some(Duration::from_secs_f64(
+                            values[0..=self.count].iter().sum::<f64>() / (self.count as f64),
+                        ))
                     } else {
-                        Some(Duration::from_secs_f64(values.iter().sum::<f64>()/(*size as f64)))
+                        Some(Duration::from_secs_f64(
+                            values.iter().sum::<f64>() / (*size as f64),
+                        ))
                     }
                 } else {
                     None
@@ -415,7 +483,7 @@ impl<I: Iterator> ProgressRecorderIter<I> {
             }
         };
 
-        let res = ProgressRecord{
+        let res = ProgressRecord {
             num: self.count,
             iterating_for: now - self.started_iterating,
             size_hint: self.iter.size_hint(),
@@ -429,7 +497,7 @@ impl<I: Iterator> ProgressRecorderIter<I> {
 
         self.previous_record_tm = Some(now);
 
-        res
+        Some(res)
     }
 
     /// Returns referend to the inner iterator
@@ -441,30 +509,28 @@ impl<I: Iterator> ProgressRecorderIter<I> {
     pub fn into_inner(self) -> I {
         self.iter
     }
-
 }
 
-/// An iterator that records it's progress as it goes along
-pub trait ProgressableIter<I> {
-    fn progress(self) -> ProgressRecorderIter<I>;
+pub trait OptionalProgressableIter<I: Iterator> {
+    fn optional_progress(self, generate_every_count: usize) -> OptionalProgressRecorderIter<I>;
 }
 
-impl<I> ProgressableIter<I> for I where I: Iterator {
-    /// Convert an iterator into a `ProgressRecorderIter`.
-    fn progress(self) -> ProgressRecorderIter<I> {
-        ProgressRecorderIter::new(self)
+impl<I> OptionalProgressableIter<I> for I
+where
+    I: Iterator,
+{
+    /// Convert an iterator into an `OptionalProgressRecorderIter`.
+    fn optional_progress(self, generate_every_count: usize) -> OptionalProgressRecorderIter<I> {
+        OptionalProgressRecorderIter::new(self, generate_every_count)
     }
 }
 
-
-impl<I> Iterator for ProgressRecorderIter<I> where I: Iterator {
-    type Item = (ProgressRecord, <I as Iterator>::Item);
+impl<I: Iterator> Iterator for OptionalProgressRecorderIter<I> {
+    type Item = (Option<ProgressRecord>, <I as Iterator>::Item);
 
     #[inline]
-    fn next(&mut self) -> Option<(ProgressRecord, <I as Iterator>::Item)> {
-        self.iter.next().map(|a| {
-            (self.generate_record(), a)
-        })
+    fn next(&mut self) -> Option<Self::Item> {
+        self.iter.next().map(|a| (self.generate_record(), a))
     }
 
     #[inline]
@@ -478,9 +544,10 @@ impl<I> Iterator for ProgressRecorderIter<I> where I: Iterator {
     }
 }
 
-
-
+#[cfg(test)]
 mod test {
+    use super::*;
+
     #[test]
     fn test_simple() {
         use super::ProgressableIter;
@@ -496,14 +563,13 @@ mod test {
         assert_eq!(state.should_do_every_n_items(2), true);
         assert_eq!(state.should_do_every_n_items(3), true);
         assert_eq!(state.should_do_every_n_items(5), true);
-        assert_eq!((state.rate()*100.).round(), 200.);
+        assert_eq!((state.rate() * 100.).round(), 200.);
         // First run, so there should be nothing here
         assert!(state.previous_record_tm().is_none());
 
         assert_eq!(state.should_do_every_n_sec(1.), false);
         assert_eq!(state.should_do_every_n_sec(2.), false);
         assert_eq!(state.should_do_every_n_sec(0.3), true);
-
 
         sleep(Duration::from_millis(500));
 
@@ -563,9 +629,7 @@ mod test {
         let (state, val) = progressor.next().unwrap();
         assert_eq!(val, 1);
         assert_eq!(state.fraction(), None);
-
     }
-
 
     #[test]
     fn assume_fraction1() {
@@ -595,7 +659,17 @@ mod test {
         let (state, val) = progressor.next().unwrap();
         assert_eq!(val, 1);
         assert_eq!(state.fraction(), None);
+    }
 
+    #[test]
+    fn optional() {
+        let vec: Vec<u8> = vec![0, 1, 2, 3, 4];
+        let progressed_iterator = vec.iter().optional_progress(3).collect::<Vec<_>>();
+        dbg!(&progressed_iterator);
+        assert!(progressed_iterator[0].0.is_none());
+        assert!(progressed_iterator[1].0.is_none());
+        assert!(progressed_iterator[2].0.is_some());
+        assert!(progressed_iterator[3].0.is_none());
+        assert!(progressed_iterator[4].0.is_none());
     }
 }
-
