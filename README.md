@@ -9,6 +9,8 @@ Wrap an iterator, and get progress data as it's executed. A more advanced
 
 # [Documentation](https://docs.rs/iter-progress/)
 
+Wrap an iterator, and get progress data as it's executed. A more advanced
+[`.enumerate()`](https://doc.rust-lang.org/std/iter/trait.Iterator.html#method.enumerate)
 
 # Usage
 Call `.progress()` on any Iterator, and get a new iterator that yields `(ProgressRecord, T)`, where `T`
@@ -17,7 +19,7 @@ of the iterator
 
 # Example
 
-```
+```rust
 use iter_progress::ProgressableIter;
 // Create an iterator that goes from 0 to 1,000
 let my_iter = 0..1_000;
@@ -40,13 +42,14 @@ assert_eq!(state.percent(), Some(0.1));
 
 Another usage:
 
-```compile_fail
+```rust
 use iter_progress::ProgressableIter;
+let my_big_vec = vec![false; 100];
 
 for (state, val) in my_big_vec.iter().progress() {
     // Every 1 second, execute this function with the the `state`
-    state.do_every_n_sec(1. |state| {
-       println!("{}% the way though, and doing {} per sec.", state.percent().unwrap(), state.rate()));
+    state.do_every_n_sec(1., |state| {
+       println!("{}% the way though, and doing {} per sec.", state.percent().unwrap(), state.rate());
     });
 
     // Do something to process `val`
@@ -55,3 +58,4 @@ for (state, val) in my_big_vec.iter().progress() {
 
 `.do_every_n_sec` is a "best effort" attempt. It's single threaded, so will be called if the
 last time that was called was more than N sec ago. `.do_every_n_items` is called every N items.
+
