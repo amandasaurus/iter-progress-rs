@@ -31,13 +31,14 @@
 //!
 //! Another usage:
 //!
-//! ```compile_fail
+//! ```
 //! use iter_progress::ProgressableIter;
+//! # let my_big_vec = vec![false; 100];
 //!
 //! for (state, val) in my_big_vec.iter().progress() {
 //!     // Every 1 second, execute this function with the the `state`
-//!     state.do_every_n_sec(1. |state| {
-//!        println!("{}% the way though, and doing {} per sec.", state.percent().unwrap(), state.rate()));
+//!     state.do_every_n_sec(1., |state| {
+//!        println!("{}% the way though, and doing {} per sec.", state.percent().unwrap(), state.rate());
 //!     });
 //!
 //!     // Do something to process `val`
