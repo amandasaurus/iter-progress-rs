@@ -49,8 +49,8 @@
 //! last time that was called was more than N sec ago. `.do_every_n_items` is called every N items.
 
 use std::iter::Iterator;
-use std::time::{Duration, Instant};
 use std::ops::{Deref, DerefMut};
+use std::time::{Duration, Instant};
 
 #[cfg(test)]
 mod tests;
