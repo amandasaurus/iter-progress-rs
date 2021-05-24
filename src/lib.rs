@@ -176,6 +176,19 @@ impl ProgressRecord {
     }
 
     /// Assume that this is actually at this fraction through
+    /// If the underlying Iterator doesn't provide a useful `size_hint`, but you "know" the real
+    /// fraction (e.g. if reading from a file), you can override the value for this
+    /// `ProgressRecord`. This new value is used for rate & time calculations.
+    ///
+    /// ```
+    /// # use iter_progress::ProgressableIter;
+    /// let mut progressor = (0..).progress();
+    /// let (mut state, _num) = progressor.next().unwrap();
+    /// assert_eq!(state.fraction(), None);     // No fraction possible
+    /// // Be we know we're 12% the way through
+    /// state.assume_fraction(0.12);
+    /// assert_eq!(state.fraction(), Some(0.12));
+    /// ```
     pub fn assume_fraction(&mut self, f: impl Into<f64>) {
         self.assumed_fraction = Some(f.into())
     }
