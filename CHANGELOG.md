@@ -1,6 +1,7 @@
 ## v0.8.0 (2021-04-24)
 
 * New functionality: `OptionalProgress` for when generating a timestamp every iteration might be a performance hit.
+* Internal refactoring to speed up unit tests
 
 ## v0.7.0 (2020-06-12)
 

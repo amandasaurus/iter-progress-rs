@@ -357,7 +357,8 @@ impl<I: Iterator> ProgressRecorderIter<I> {
         ProgressRecorderIter(OptionalProgressRecorderIter::new(iter, 1))
     }
 
-    pub(crate) fn set_fake_now(&mut self, fake_now: impl Into<Option<Instant>>) {
+    #[cfg(test)]
+    fn set_fake_now(&mut self, fake_now: impl Into<Option<Instant>>) {
         self.0.set_fake_now(fake_now);
     }
 }
@@ -454,7 +455,7 @@ impl<I: Iterator> OptionalProgressRecorderIter<I> {
             return None;
         }
 
-        let now = fake_now.unwrap_or_else(|| Instant::now());
+        let now = fake_now.unwrap_or_else(Instant::now);
 
         let exp_average_rate = if let Some((rate, last)) = self.exp_average {
             if let Some(previous_tm) = self.previous_record_tm {
@@ -521,7 +522,8 @@ impl<I: Iterator> OptionalProgressRecorderIter<I> {
         self.iter
     }
 
-    pub(crate) fn set_fake_now(&mut self, fake_now: impl Into<Option<Instant>>) {
+    #[cfg(test)]
+    fn set_fake_now(&mut self, fake_now: impl Into<Option<Instant>>) {
         self._fake_now = fake_now.into();
     }
 }
