@@ -367,7 +367,7 @@ impl<I> AsMut<OptionalProgressRecorderIter<I>> for ProgressRecorderIter<I> {
 
 impl<I: Iterator> Deref for ProgressRecorderIter<I> {
     type Target = OptionalProgressRecorderIter<I>;
-    fn deref<'a>(&'a self) -> &'a OptionalProgressRecorderIter<I> {
+    fn deref(&self) -> &OptionalProgressRecorderIter<I> {
         &self.0
     }
 }
