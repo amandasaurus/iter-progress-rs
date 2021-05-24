@@ -470,6 +470,13 @@ impl<I: Iterator> OptionalProgressRecorderIter<I> {
     /// the `.size_hint()` from the iterator will override this if it returns an exact size (i.e.
     /// `.size_hint().1 == Some(...size_hint().0).
     /// Set to `None` to undo this.
+    ///
+    /// ```
+    /// # use iter_progress::ProgressableIter;
+    /// let mut progressor = (0..).progress().assume_size(10);
+    /// let (state, num) = progressor.next().unwrap();
+    /// assert_eq!(state.fraction(), Some(0.1));
+    /// ```
     pub fn assume_size(self, size: impl Into<Option<usize>>) -> Self {
         let mut new = self;
         new.assumed_size = size.into();
