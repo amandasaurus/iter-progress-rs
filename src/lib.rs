@@ -384,9 +384,10 @@ impl<I: Iterator> ProgressRecorderIter<I> {
         ProgressRecorderIter(OptionalProgressRecorderIter::new(iter, 1))
     }
 
-    #[cfg(test)]
-    fn set_fake_now(&mut self, fake_now: impl Into<Option<Instant>>) {
-        self.0.set_fake_now(fake_now);
+    pub fn assume_size(self, size: impl Into<Option<usize>>) -> Self {
+        let mut new = self;
+        new.0.assumed_size = size.into();
+        new
     }
 }
 
