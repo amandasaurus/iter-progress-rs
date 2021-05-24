@@ -1,3 +1,7 @@
+## v0.8.0 (2021-04-24)
+
+* New functionality: `OptionalProgress` for when generating a timestamp every iteration might be a performance hit.
+
 ## v0.7.0 (2020-06-12)
 
 * State gets `.assume_fraction(…)` for when you want to force a specific fraction value

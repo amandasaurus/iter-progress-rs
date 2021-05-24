@@ -13,9 +13,17 @@ Wrap an iterator, and get progress data as it's executed. A more advanced
 [`.enumerate()`](https://doc.rust-lang.org/std/iter/trait.Iterator.html#method.enumerate)
 
 # Usage
+
 Call `.progress()` on any Iterator, and get a new iterator that yields `(ProgressRecord, T)`, where `T`
 is the original value. A `ProgressRecord` has many helpful methods to query the current state
 of the iterator
+
+At every iteration, the current time is calculated. For iterators generating
+lots of items per second, this might be a noticable performance hit. Use
+`.optional_progress(N)` to generate a new iterator that yields
+`(Option<ProgressRecord>, T)`. Every N items, the result will be
+`(Some(ProgressRecord), T)`, otherwise `(None, T)` is returned and no call to
+get the current time is made. 
 
 # Example
 
