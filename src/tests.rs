@@ -3,59 +3,67 @@ use super::*;
 #[test]
 fn test_simple() {
     use super::ProgressableIter;
-    use std::thread::sleep;
     use std::time::Duration;
 
-    let vec: Vec<u8> = vec![0, 1, 2, 3, 4];
-    let mut progressor = vec.iter().progress();
+    let mut progressor = (0..).progress();
 
-    sleep(Duration::from_millis(500));
+    // 0
     let (state, _) = progressor.next().unwrap();
+    let mut fake_now = state.started_iterating().clone();
+
     // It'll always print on the first one
     assert_eq!(state.should_do_every_n_items(2), true);
     assert_eq!(state.should_do_every_n_items(3), true);
     assert_eq!(state.should_do_every_n_items(5), true);
-    assert_eq!((state.rate() * 100.).round(), 200.);
     // First run, so there should be nothing here
     assert!(state.previous_record_tm().is_none());
+
+    // 1 +500ms
+    fake_now += Duration::from_millis(500);
+    progressor.set_fake_now(fake_now.clone());
+    let (state, _) = progressor.next().unwrap();
+
+    assert_eq!(state.rate().round(), 4.0);
 
     assert_eq!(state.should_do_every_n_sec(1.), false);
     assert_eq!(state.should_do_every_n_sec(2.), false);
     assert_eq!(state.should_do_every_n_sec(0.3), true);
 
-    sleep(Duration::from_millis(500));
-
+    // 2 +1sec
+    fake_now += Duration::from_millis(500);
+    progressor.set_fake_now(fake_now.clone());
     let (state, _) = progressor.next().unwrap();
-    assert_eq!(state.should_do_every_n_items(2), false);
+
+    assert_eq!(state.should_do_every_n_items(2), true);
     assert_eq!(state.should_do_every_n_items(3), false);
     assert_eq!(state.should_do_every_n_items(5), false);
-    assert_eq!(state.rate().round(), 2.);
-    // This'll be the time for the first one
-    assert!(state.previous_record_tm().is_some());
-    let since_last_time = state.previous_record_tm().unwrap().elapsed();
-    assert!(since_last_time < Duration::from_millis(550));
-    assert!(since_last_time >= Duration::from_millis(500));
+    assert_eq!(state.rate().round(), 3.);
     assert_eq!(state.should_do_every_n_sec(1.), true);
     assert_eq!(state.should_do_every_n_sec(2.), false);
     assert_eq!(state.should_do_every_n_sec(0.8), true);
 
-    sleep(Duration::from_millis(500));
+    // 3 +1.5sec
+    fake_now += Duration::from_millis(500);
+    progressor.set_fake_now(fake_now.clone());
     let (state, _) = progressor.next().unwrap();
-    assert_eq!(state.should_do_every_n_items(2), true);
-    assert_eq!(state.should_do_every_n_items(3), false);
+    assert_eq!(state.should_do_every_n_items(2), false);
+    assert_eq!(state.should_do_every_n_items(3), true);
     assert_eq!(state.should_do_every_n_items(5), false);
-    assert_eq!(state.rate().round(), 2.);
+    assert_eq!(state.rate().round(), 3.);
     assert_eq!(state.should_do_every_n_sec(1.), false);
     assert_eq!(state.should_do_every_n_sec(2.), false);
     assert_eq!(state.should_do_every_n_sec(0.8), false);
     assert_eq!(state.should_do_every_n_sec(1.5), true);
 
-    sleep(Duration::from_millis(500));
+    // 4 +2sec
+    fake_now += Duration::from_millis(500);
+    progressor.set_fake_now(fake_now.clone());
     let (state, _) = progressor.next().unwrap();
-    assert_eq!(state.should_do_every_n_items(2), false);
-    assert_eq!(state.should_do_every_n_items(3), true);
+    assert_eq!(state.should_do_every_n_items(2), true);
+    assert_eq!(state.should_do_every_n_items(3), false);
+    assert_eq!(state.should_do_every_n_items(4), true);
     assert_eq!(state.should_do_every_n_items(5), false);
-    assert_eq!(state.rate().round(), 2.);
+    assert_eq!(state.rate().round(), 3.);
 }
 
 #[test]

@@ -104,9 +104,9 @@ impl ProgressRecord {
     ///
     /// ```rust
     /// # use iter_progress::ProgressableIter;
-    /// let mut progressor = (0..1_000).progress().skip(120);
+    /// let mut progressor = (0..1_000).progress().skip(10);
     /// let (state, num) = progressor.next().unwrap();
-    /// assert_eq!(state.num_done(), 121);
+    /// assert_eq!(state.num_done(), 11);
     /// ```
     pub fn num_done(&self) -> usize {
         self.num
@@ -313,6 +313,7 @@ impl ProgressRecord {
         self.fraction()
             .map(|f| self.duration_since_start().div_f64(f))
     }
+
 }
 
 pub struct OptionalProgressRecorderIter<I> {
@@ -332,6 +333,8 @@ pub struct OptionalProgressRecorderIter<I> {
     rolling_average: Option<(usize, Vec<f64>)>,
     exp_average: Option<(f64, Option<Duration>)>,
     assumed_size: Option<usize>,
+
+    _fake_now: Option<Instant>,
 }
 
 /// Wraps an iterator and keeps track of state used for `ProgressRecord`'s
@@ -353,6 +356,10 @@ impl<I: Iterator> ProgressRecorderIter<I> {
     /// Create a new `ProgressRecorderIter` from another iterator.
     pub fn new(iter: I) -> ProgressRecorderIter<I> {
         ProgressRecorderIter(OptionalProgressRecorderIter::new(iter, 1))
+    }
+
+    pub(crate) fn set_fake_now(&mut self, fake_now: impl Into<Option<Instant>>) {
+        self.0.set_fake_now(fake_now);
     }
 }
 
@@ -380,8 +387,9 @@ where
     #[inline]
     fn next(&mut self) -> Option<(ProgressRecord, <I as Iterator>::Item)> {
         self.0.iter.next().map(|a| {
+            let fake_now = std::mem::take(&mut self.0._fake_now);
             // we know there is always a record generated
-            (self.0.generate_record().unwrap(), a)
+            (self.0.generate_record(fake_now).unwrap(), a)
         })
     }
 
@@ -407,6 +415,7 @@ impl<I: Iterator> OptionalProgressRecorderIter<I> {
             rolling_average: None,
             exp_average: None,
             assumed_size: None,
+            _fake_now: None,
         }
     }
 
@@ -440,13 +449,13 @@ impl<I: Iterator> OptionalProgressRecorderIter<I> {
     }
 
     /// Calculate the current `ProgressRecord` for where we are now.
-    fn generate_record(&mut self) -> Option<ProgressRecord> {
+    fn generate_record(&mut self, fake_now: Option<Instant>) -> Option<ProgressRecord> {
         self.count += 1;
         if self.count % self.generate_every_count != 0 {
             return None;
         }
 
-        let now = Instant::now();
+        let now = fake_now.unwrap_or_else(|| Instant::now());
 
         let exp_average_rate = if let Some((rate, last)) = self.exp_average {
             if let Some(previous_tm) = self.previous_record_tm {
@@ -512,6 +521,10 @@ impl<I: Iterator> OptionalProgressRecorderIter<I> {
     pub fn into_inner(self) -> I {
         self.iter
     }
+
+    pub(crate) fn set_fake_now(&mut self, fake_now: impl Into<Option<Instant>>) {
+        self._fake_now = fake_now.into();
+    }
 }
 
 pub trait OptionalProgressableIter<I: Iterator> {
@@ -533,7 +546,8 @@ impl<I: Iterator> Iterator for OptionalProgressRecorderIter<I> {
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
-        self.iter.next().map(|a| (self.generate_record(), a))
+        let fake_now = std::mem::take(&mut self._fake_now);
+        self.iter.next().map(|a| (self.generate_record(fake_now), a))
     }
 
     #[inline]
