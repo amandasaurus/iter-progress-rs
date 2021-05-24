@@ -50,6 +50,7 @@
 
 use std::iter::Iterator;
 use std::time::{Duration, Instant};
+use std::ops::{Deref, DerefMut};
 
 #[cfg(test)]
 mod tests;
@@ -347,6 +348,19 @@ impl<I> AsRef<OptionalProgressRecorderIter<I>> for ProgressRecorderIter<I> {
 
 impl<I> AsMut<OptionalProgressRecorderIter<I>> for ProgressRecorderIter<I> {
     fn as_mut(&mut self) -> &mut OptionalProgressRecorderIter<I> {
+        &mut self.0
+    }
+}
+
+impl<I: Iterator> Deref for ProgressRecorderIter<I> {
+    type Target = OptionalProgressRecorderIter<I>;
+    fn deref<'a>(&'a self) -> &'a OptionalProgressRecorderIter<I> {
+        &self.0
+    }
+}
+
+impl<I: Iterator> DerefMut for ProgressRecorderIter<I> {
+    fn deref_mut(&mut self) -> &mut OptionalProgressRecorderIter<I> {
         &mut self.0
     }
 }
