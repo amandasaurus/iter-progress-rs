@@ -313,7 +313,6 @@ impl ProgressRecord {
         self.fraction()
             .map(|f| self.duration_since_start().div_f64(f))
     }
-
 }
 
 pub struct OptionalProgressRecorderIter<I> {
@@ -547,7 +546,9 @@ impl<I: Iterator> Iterator for OptionalProgressRecorderIter<I> {
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         let fake_now = std::mem::take(&mut self._fake_now);
-        self.iter.next().map(|a| (self.generate_record(fake_now), a))
+        self.iter
+            .next()
+            .map(|a| (self.generate_record(fake_now), a))
     }
 
     #[inline]
